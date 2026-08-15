@@ -1,0 +1,9 @@
+{
+  "repo_url": "https://github.com/nexora-protocol/nexora",
+  "telegram": ["TELEGRAM_USERNAME"],
+  "name": "Nexora Protocol",
+  "one_liner": "Starknet as the privacy layer for the multichain economy",
+  "slug": "nexora-protocol",
+  "category": "Infrastructure",
+  "inspired_by": "RFP-09"
+}

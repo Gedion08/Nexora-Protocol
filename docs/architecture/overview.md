@@ -1,0 +1,190 @@
+# Nexora Protocol — Architecture Overview
+
+Nexora Protocol is a four-layer protocol that turns Starknet and the STRK20 privacy pool into a cross-chain privacy routing engine. Users interact with a simple intent-based interface; the protocol selects bridges, manages accounts, and handles privacy operations atomically.
+
+---
+
+## Design Principles
+
+1. **Privacy by protocol, not by UI.** The cryptographic primitives live in Cairo contracts and the STRK20 pool. The frontend is a thin intent layer.
+2. **Chain abstraction for the user.** Users never leave their home chain mentally. They specify intent; Nexora Protocol executes.
+3. **Compliance-native.** Mandatory deposit screening (FPI), viewing keys, and selective disclosure are first-class citizens, not afterthoughts.
+4. **Composable over monolithic.** Each layer (adapters, core, routing, disclosure) is independently upgradeable and testable.
+5. **Mainnet-first.** Every component is designed to run against live STRK20 mainnet from day one.
+
+---
+
+## High-Level Data Flow
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Arbitrum   │────▶│  Nexora Protocol │────▶│     Base     │
+│  (Source)    │     │   Protocol   │     │ (Destination)│
+└──────────────┘     └──────┬──────┘     └──────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              │             │             │
+        Layer 1      Layer 2       Layer 3
+      Source Adapter  Privacy Core  Routing Engine
+              │             │             │
+              └─────────────┼─────────────┘
+                            │
+                      Layer 4
+                  Selective Disclosure
+```
+
+**User flow:**
+1. User connects Arbitrum wallet via MetaMask.
+2. User submits intent: `from: Arbitrum, asset: USDC, amount: 5000, to: Base, recipient: fresh, privacy: maximum`.
+3. Nexora Protocol selects LayerSwap as the source bridge.
+4. A relayer executes the bridge and deposits into the STRK20 pool on behalf of the user.
+5. The user receives a STRK20 shielded note.
+6. The user later requests withdrawal to Base.
+7. Nexora Protocol selects LayerSwap for the destination bridge, generates a fresh Base address, and executes an unshield → bridge → fund flow.
+8. The destination address receives funds with no on-chain link to the source.
+
+---
+
+## The Four Layers
+
+### Layer 1 — Source Adapters
+
+Source adapters abstract the deposit side of each supported chain.
+
+**Responsibilities:**
+- Wrap bridge APIs (LayerSwap, StarkGate, Orbiter)
+- Handle chain-specific signing (EVM EIP-712, Solana transactions)
+- Manage relayer inventory and rebalancing
+- Emit standardized deposit events
+
+**MVP:**
+- `ArbitrumAdapter`
+- `BaseAdapter` (destination-only in MVP)
+
+**Stretch:**
+- `EthereumAdapter`
+- `OptimismAdapter`
+- `SolanaAdapter`
+
+### Layer 2 — Privacy Core
+
+Privacy Core is the heart of the protocol. It manages the STRK20 shielded state on behalf of users.
+
+**Responsibilities:**
+- Viewing key registration (Poseidon-derived from wallet signature)
+- Shielding (deposit into STRK20 pool, issue encrypted note)
+- Private note discovery (query indexer for unspent notes)
+- Private transfer (note-to-note, emits nullifier)
+- Unshielding (burn note, emit withdrawal)
+
+**Why this layer exists:**
+The STRK20 pool is low-level. Privacy Core provides a deterministic, auditable interface that the Routing Engine and Adapters can call without understanding the underlying cryptography.
+
+### Layer 3 — Intent / Routing Engine
+
+The Routing Engine converts user intent into an executable route.
+
+**Responsibilities:**
+- Parse intent (source, asset, amount, destination, recipient, privacy, fee)
+- Select optimal bridge(s) based on fee, speed, reliability
+- Generate deterministic Starknet accounts for recipients
+- Orchestrate multi-step flows atomically where possible
+- Manage relayer gas via Paymaster
+- Emit route status events
+
+**Route example (Arbitrum → Base):**
+```
+1. User signs EVM message (intent)
+2. Relayer calls LayerSwap API to reserve bridge slot
+3. Relayer executes bridge: USDC Arbitrum → USDC Starknet
+4. Relayer calls PrivacyHub.shield() on Starknet
+5. PrivacyHub deposits USDC into STRK20 pool
+6. Note credited to user's viewing key
+7. [Later] User requests withdrawal
+8. Relayer generates fresh Base address
+9. Relayer executes PrivacyHub.unshield()
+10. Relayer executes LayerSwap: USDC Starknet → USDC Base
+11. Fresh Base address funded
+```
+
+### Layer 4 — Selective Disclosure
+
+Selective Disclosure lets users prove specific facts without revealing their entire private state.
+
+**Disclosure types:**
+- `full`: Everything visible
+- `partial`: User selects which fields to disclose
+- `amount`: Transaction value above threshold
+- `source`: Funds originated from specific wallet
+- `auditor`: Complete history to designated auditor
+- `none`: Minimal public data only
+
+**Implementation:**
+- Viewing key derivation is already part of STRK20
+- Disclosure proofs are zero-knowledge proofs generated by the prover service
+- The frontend provides a disclosure manager UI
+
+---
+
+## System Boundaries
+
+### What Nexora Protocol Does
+- Provides a unified intent interface for cross-chain private transfers
+- Manages deterministic Starknet accounts for non-Starknet users
+- Orchestrates bridge → shield → unshield → bridge flows
+- Exposes selective disclosure tooling
+- Sponsors gas via Paymaster so users never hold STRK
+
+### What Nexora Protocol Does NOT Do
+- Operate its own bridge liquidity (relies on LayerSwap, StarkGate, Orbiter)
+- Run a centralized exchange or KYC (compliance is via FPI deposit screening)
+- Guarantee "mathematically impossible to link" (claims are limited to "minimized public linkability")
+- Hide deposit amounts or depositor addresses (shielding is public; privacy is in the note-to-note transfer)
+
+---
+
+## Trust Model
+
+| Party | Trust Level | Rationale |
+|-------|-------------|-----------|
+| STRK20 Pool | Protocol trust | Open-source Cairo contracts, audited |
+| FPI (Compliance) | Regulatory trust | Mandatory deposit screening, on-chain verification |
+| LayerSwap | Operational trust | Existing bridge, track record |
+| Nexora Protocol Relayer | Custodial (small) | Relayer holds inventory temporarily; user funds are never held in Nexora Protocol contracts long-term |
+| User wallet | User control | User retains signing control on source chain |
+| Starknet Wallet | User control | For destination chain if user has Starknet wallet |
+
+---
+
+## Key Constraints
+
+1. **Shielding is public.** The deposit event emits user address, token, and amount. Privacy starts *after* shielding.
+2. **Withdrawal timing leaks metadata.** Distinctive amounts executed shortly after distinctive deposits are correlatable.
+3. **Anonymity set is small at launch.** The product is the onboarding funnel that grows the set.
+4. **Relayer inventory is a feature, not a bug.** Pre-funded relayers improve UX and reduce bridge flakiness.
+5. **Deterministic accounts are EVM-only in MVP.** Solana is a stretch goal.
+
+---
+
+## Success Criteria
+
+A successful submission demonstrates:
+
+1. Arbitrum → Starknet → Base flow end-to-end on mainnet
+2. Three mainnet transactions touching the STRK20 pool
+3. Fresh destination address (no link to source)
+4. Selective disclosure working
+5. Paymaster-sponsored gas
+6. Live demo at a public URL
+7. 3-minute demo video
+
+---
+
+## Next Steps
+
+- [Nexora Protocol Protocol](docs/architecture/nexora-protocol.md) — detailed protocol specification
+- [Privacy Core](docs/architecture/privacy-core.md) — STRK20 integration
+- [Source & Destination Adapters](docs/architecture/adapters.md)
+- [Routing Engine](docs/architecture/routing-engine.md)
+- [Selective Disclosure](docs/architecture/disclosure.md)
+- [Sprint Roadmap](docs/roadmap.md)
