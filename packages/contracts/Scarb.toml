@@ -6,6 +6,7 @@ cairo-version = "2.20.0"
 
 [[target.starknet-contract]]
 sierra = true
+casm = true
 
 [dependencies]
 starknet = "2.20.0"
