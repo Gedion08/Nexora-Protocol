@@ -19,8 +19,11 @@ import {
   NexoraError,
   ErrorCode,
   ViewingKeyError,
+  TransferError,
+  PaymasterError,
 } from '../utils/errors';
 import { ErrorCodeValue } from '../utils/errors';
+import { PaymasterClient, PaymasterConfig, PaymasterSponsorshipResponse } from './paymaster';
 
 type ContractResponse = { transaction_hash?: string } | string;
 
@@ -42,12 +45,12 @@ function createTxResult(
     transactionHash: txHash,
     wait: async (waitTimeoutMs?: number): Promise<TransactionReceipt> => {
       const timeout = waitTimeoutMs ?? timeoutMs;
-      const raceResult = await Promise.race([
+      const raceResult = (await Promise.race([
         provider.waitForTransaction(txHash, { retryInterval: 2000 }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new ShieldError('Transaction ' + txHash + ' timed out after ' + timeout + 'ms')), timeout)
         ),
-      ]);
+      ])) as any;
       return normalizeReceipt(txHash, raceResult);
     },
   };
@@ -70,6 +73,7 @@ export class PoolClient {
   readonly poolAddress: string;
   readonly chainId: string;
   readonly timeoutMs: number;
+  readonly paymaster?: PaymasterClient;
 
   private poolContract: Contract | null = null;
   private providerChainId: string | null = null;
@@ -85,6 +89,7 @@ export class PoolClient {
     this.chainId = config.chainId ?? '';
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TX_WAIT_TIMEOUT_MS;
     this.provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+    this.paymaster = config.paymaster ? new PaymasterClient(config.paymaster) : undefined;
   }
 
   async getContract(): Promise<Contract> {
@@ -128,9 +133,21 @@ export class PoolClient {
     return this.withError(async () => {
       const pk = num.toHex(typeof publicKey === 'bigint' ? publicKey : num.toBigInt(publicKey));
       const contract = await this.getContract();
-      const response: ContractResponse = await contract.register_viewing_key(pk, {
-        from: account.address,
-      });
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.poolAddress,
+            'register_viewing_key',
+            [pk],
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for register_viewing_key', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
+      const response: ContractResponse = await contract.register_viewing_key(pk, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.VIEWING_KEY_NOT_REGISTERED);
@@ -141,15 +158,30 @@ export class PoolClient {
     token: string,
     amount: bigint | string,
     viewingKey: bigint | string,
-    proof?: unknown[]
+    proof: unknown[] = []
   ): Promise<TransactionResult> {
     return this.withError(async () => {
       const amountHex = typeof amount === 'bigint' ? num.toHex(amount) : amount;
       const vk = typeof viewingKey === 'bigint' ? num.toHex(viewingKey) : viewingKey;
       const contract = await this.getContract();
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const calldata: string[] = [token, amountHex, account.address, vk, ...proof.map(String)];
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.poolAddress,
+            'shield',
+            calldata,
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for shield', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
       const response: ContractResponse = await contract.shield(
-        token, amountHex, account.address, vk, proof ?? [],
-        { from: account.address }
+        token, amountHex, account.address, vk, proof,
+        options
       );
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
@@ -161,14 +193,29 @@ export class PoolClient {
     token: string,
     amount: bigint | string,
     recipient: string,
-    proof: unknown[]
+    proof: unknown[] = []
   ): Promise<TransactionResult> {
     return this.withError(async () => {
       const amountHex = typeof amount === 'bigint' ? num.toHex(amount) : amount;
       const contract = await this.getContract();
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const calldata: string[] = [token, amountHex, recipient, ...proof.map(String)];
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.poolAddress,
+            'unshield',
+            calldata,
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for unshield', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
       const response: ContractResponse = await contract.unshield(
         token, amountHex, recipient, proof,
-        { from: account.address }
+        options
       );
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
@@ -180,14 +227,29 @@ export class PoolClient {
     to: string,
     token: string,
     amount: bigint | string,
-    proof: unknown[]
+    proof: unknown[] = []
   ): Promise<TransactionResult> {
     return this.withError(async () => {
       const amountHex = typeof amount === 'bigint' ? num.toHex(amount) : amount;
       const contract = await this.getContract();
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const calldata: string[] = [to, token, amountHex, ...proof.map(String)];
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.poolAddress,
+            'transfer',
+            calldata,
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for transfer', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
       const response: ContractResponse = await contract.transfer(
         to, token, amountHex, proof,
-        { from: account.address }
+        options
       );
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
@@ -210,6 +272,7 @@ export class PrivacyHubClient {
   readonly poolAddress: string;
   readonly chainId: string;
   readonly timeoutMs: number;
+  readonly paymaster?: PaymasterClient;
 
   private privacyHubContract: Contract | null = null;
   private resolvedChainId: string | null = null;
@@ -226,6 +289,7 @@ export class PrivacyHubClient {
     this.chainId = config.chainId ?? '';
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TX_WAIT_TIMEOUT_MS;
     this.provider = new RpcProvider({ nodeUrl: config.rpcUrl });
+    this.paymaster = config.paymaster ? new PaymasterClient(config.paymaster) : undefined;
   }
 
   async getContract(): Promise<Contract> {
@@ -253,9 +317,21 @@ export class PrivacyHubClient {
     return this.withError(async () => {
       const pk = num.toHex(typeof publicKey === 'bigint' ? publicKey : num.toBigInt(publicKey));
       const contract = await this.getContract();
-      const response: ContractResponse = await contract.register_viewing_key(pk, {
-        from: account.address,
-      });
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.privacyHubAddress,
+            'register_viewing_key',
+            [pk],
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for register_viewing_key', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
+      const response: ContractResponse = await contract.register_viewing_key(pk, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.VIEWING_KEY_NOT_REGISTERED);
@@ -268,9 +344,21 @@ export class PrivacyHubClient {
       if (amountBig <= 0n) throw new InvalidArgumentError('Amount must be greater than zero');
 
       const contract = await this.getContract();
-      const response: ContractResponse = await contract.shield(token, num.toHex(amountBig), {
-        from: account.address,
-      });
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.privacyHubAddress,
+            'shield',
+            [token, num.toHex(amountBig)],
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for shield', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
+      const response: ContractResponse = await contract.shield(token, num.toHex(amountBig), options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.SHIELD_FAILED);
@@ -284,9 +372,21 @@ export class PrivacyHubClient {
       if (amountBig <= 0n) throw new InvalidArgumentError('Amount must be greater than zero');
 
       const contract = await this.getContract();
-      const response: ContractResponse = await contract.unshield(token, num.toHex(amountBig), recipient, {
-        from: account.address,
-      });
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.privacyHubAddress,
+            'unshield',
+            [token, num.toHex(amountBig), recipient],
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for unshield', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
+      const response: ContractResponse = await contract.unshield(token, num.toHex(amountBig), recipient, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.UNSHIELD_FAILED);
@@ -300,9 +400,21 @@ export class PrivacyHubClient {
       if (amountBig <= 0n) throw new InvalidArgumentError('Amount must be greater than zero');
 
       const contract = await this.getContract();
-      const response: ContractResponse = await contract.private_transfer(to, token, num.toHex(amountBig), {
-        from: account.address,
-      });
+      const options: Record<string, unknown> = { from: account.address };
+      if (this.paymaster) {
+        try {
+          const sponsorship = await this.paymaster.sponsorTransaction(
+            account,
+            this.privacyHubAddress,
+            'private_transfer',
+            [to, token, num.toHex(amountBig)],
+          );
+          options.paymasterData = sponsorship.paymasterData;
+        } catch (error) {
+          throw new PaymasterError('Failed to get paymaster sponsorship for private_transfer', ErrorCode.TRANSACTION_FAILED, error);
+        }
+      }
+      const response: ContractResponse = await contract.private_transfer(to, token, num.toHex(amountBig), options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.TRANSFER_FAILED);
@@ -348,6 +460,10 @@ export {
   UnshieldError,
   ViewingKeyError,
   InvalidArgumentError,
+  TransferError,
+  PaymasterError,
   ErrorCode,
 };
 export type { ContractResponse };
+export { PaymasterClient };
+export type { PaymasterConfig, PaymasterSponsorshipResponse };

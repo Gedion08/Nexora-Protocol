@@ -1,11 +1,26 @@
-export { PoolClient, PrivacyHubClient } from './core/client';
-export type { ContractResponse } from './core/client';
+export { PoolClient, PrivacyHubClient, PaymasterClient } from './core/client';
+export type { ContractResponse, PaymasterConfig, PaymasterSponsorshipResponse } from './core/client';
 
 export { ViewingKey, ViewingKeyManager } from './privacy/viewing-key';
 export { ShieldBuilder } from './privacy/shield';
 export { UnshieldBuilder } from './privacy/unshield';
+export { PrivateTransferBuilder } from './privacy/private-transfer';
 export { NoteDiscovery, IndexerDiscoveryProvider } from './privacy/discovery';
 export { ProvingService } from './privacy/prover';
+
+export { LayerSwapClient, LayerSwapApiError, ArbitrumAdapter } from './adapters';
+export type {
+  AdapterConfig,
+  ArbitrumAdapterConfig,
+  BridgeQuote,
+  BridgeReservation,
+  DepositAction,
+  DepositStatus,
+  DepositStatusResult,
+  BridgeToken,
+  BridgeNetwork,
+  NetworkEnvironment,
+} from './adapters';
 
 export type {
   ShieldedNote,
@@ -29,6 +44,7 @@ export type {
   ViewingKeyRegisteredEvent,
   ShieldResult,
   UnshieldResult,
+  TransferResult,
   SupportedError,
 } from './types';
 
@@ -50,9 +66,11 @@ export {
   ViewingKeyError,
   ShieldError,
   UnshieldError,
+  TransferError,
   DiscoveryError,
   ProverError,
   InvalidArgumentError,
+  PaymasterError,
   isErrorCode,
 } from './utils/errors';
 export type { ErrorCodeValue } from './utils/errors';

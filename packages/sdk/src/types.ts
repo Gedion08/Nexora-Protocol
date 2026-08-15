@@ -101,6 +101,11 @@ export interface PoolClientConfig {
   poolAddress: string;
   chainId?: string;
   timeoutMs?: number;
+  paymaster?: {
+    rpcUrl: string;
+    paymasterAddress?: string;
+    timeoutMs?: number;
+  };
 }
 
 export interface PrivacyHubClientConfig {
@@ -109,6 +114,11 @@ export interface PrivacyHubClientConfig {
   poolAddress: string;
   chainId?: string;
   timeoutMs?: number;
+  paymaster?: {
+    rpcUrl: string;
+    paymasterAddress?: string;
+    timeoutMs?: number;
+  };
 }
 
 export interface ProvingServiceConfig {
@@ -143,6 +153,15 @@ export interface ViewingKeyRegisteredEvent {
   user: string;
   publicKey: bigint;
   timestamp: number;
+}
+
+export interface TransferResult extends TransactionResult {
+  nullifier: string;
+  amount: bigint;
+  token: string;
+  recipient: string;
+  account?: string;
+  status?: string;
 }
 
 export interface ShieldResult extends TransactionResult {

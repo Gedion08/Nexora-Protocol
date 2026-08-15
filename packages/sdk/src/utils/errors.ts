@@ -55,6 +55,13 @@ export class UnshieldError extends NexoraError {
   }
 }
 
+export class TransferError extends NexoraError {
+  constructor(message: string, cause?: unknown) {
+    super(message, ErrorCode.TRANSFER_FAILED, cause);
+    this.name = 'TransferError';
+  }
+}
+
 export class DiscoveryError extends NexoraError {
   constructor(message: string, cause?: unknown) {
     super(message, ErrorCode.INDEXER_ERROR, cause);
@@ -73,6 +80,13 @@ export class InvalidArgumentError extends NexoraError {
   constructor(message: string, cause?: unknown) {
     super(message, ErrorCode.INVALID_ARGUMENT, cause);
     this.name = 'InvalidArgumentError';
+  }
+}
+
+export class PaymasterError extends NexoraError {
+  constructor(message: string, code?: ErrorCodeValue, cause?: unknown) {
+    super(message, code ?? ErrorCode.TRANSACTION_FAILED, cause);
+    this.name = 'PaymasterError';
   }
 }
 
