@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProvingService } from '../src/privacy/prover';
 import { ViewingKey } from '../src/privacy/viewing-key';
 import { ProverError, InvalidArgumentError } from '../src/utils/errors';
-import { UnshieldProof, UnshieldProofParams } from '../src/types';
+import { UnshieldProof, UnshieldProofParams, DisclosureProofParams } from '../src/types';
 import { ShieldedNote } from '../src/types';
 
 describe('ProvingService', () => {
@@ -351,5 +351,226 @@ describe('ProvingService validation', () => {
         chainId: 'SN_MAIN',
       })
     ).rejects.toThrow(InvalidArgumentError);
+  });
+});
+
+describe('ProvingService generateDisclosureProof', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const r = 12345678901234567890n;
+  const s = 98765432109876543210n;
+  const chainId = '0x534e5f4d41494e';
+  const poolAddress = '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a';
+  const viewingKey = ViewingKey.deriveFromSignature(r, s, chainId, poolAddress);
+
+  const validDisclosureResponse = {
+    proof: '0xdisclosureproof',
+    public_inputs: ['0xinput1'],
+    statement: 'Prover owns a shielded note in the specified pool',
+  };
+
+  it('should generate a full disclosure proof', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(validDisclosureResponse),
+    }));
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.generateDisclosureProof({
+      type: 'full',
+      viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+      poolAddress,
+      chainId,
+    });
+
+    expect(result.type).toBe('full');
+    expect(result.proof).toBe('0xdisclosureproof');
+    expect(result.publicInputs).toEqual(['0xinput1']);
+    expect(result.statement).toBe('Prover owns a shielded note in the specified pool');
+    expect(result.verifiedAt).toBeGreaterThan(0);
+  });
+
+  it('should generate an amount disclosure proof with threshold', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        proof: '0xamountproof',
+        public_inputs: ['0xamtinput'],
+        statement: 'Prover proves amount >= 1000000000000000000',
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.generateDisclosureProof({
+      type: 'amount',
+      viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+      poolAddress,
+      chainId,
+      threshold: 1000000000000000000n,
+      operator: '>=',
+    });
+
+    expect(result.type).toBe('amount');
+    expect(result.proof).toBe('0xamountproof');
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.threshold).toBe('1000000000000000000');
+    expect(body.operator).toBe('>=');
+  });
+
+  it('should generate an auditor disclosure proof with expiry', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        proof: '0xauditorproof',
+        public_inputs: [],
+        statement: 'Prover grants auditor access until 2027-08-16T00:00:00.000Z',
+      }),
+    }));
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const expiresAt = Date.now() + 365 * 24 * 60 * 60 * 1000;
+    const result = await prover.generateDisclosureProof({
+      type: 'auditor',
+      viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+      poolAddress,
+      chainId,
+      auditorPublicKey: '0xauditor',
+      expiresAt,
+    });
+
+    expect(result.type).toBe('auditor');
+    expect(result.expiresAt).toBe(expiresAt);
+  });
+
+  it('should throw InvalidArgumentError for amount disclosure without threshold', async () => {
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    await expect(
+      prover.generateDisclosureProof({
+        type: 'amount',
+        viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+        poolAddress,
+        chainId,
+      })
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it('should throw InvalidArgumentError for source disclosure without sourceAddress', async () => {
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    await expect(
+      prover.generateDisclosureProof({
+        type: 'source',
+        viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+        poolAddress,
+        chainId,
+      })
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it('should throw InvalidArgumentError for auditor disclosure without auditorPublicKey', async () => {
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    await expect(
+      prover.generateDisclosureProof({
+        type: 'auditor',
+        viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+        poolAddress,
+        chainId,
+      })
+    ).rejects.toThrow(InvalidArgumentError);
+  });
+
+  it('should throw ProverError when prover response is missing proof', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ statement: 'test' }),
+    }));
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    await expect(
+      prover.generateDisclosureProof({
+        type: 'none',
+        viewingKey: { publicKey: viewingKey.publicKey, privateKey: viewingKey.privateKey },
+        poolAddress,
+        chainId,
+      })
+    ).rejects.toThrow(ProverError);
+  });
+});
+
+describe('ProvingService verifyDisclosureProof', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const r = 12345678901234567890n;
+  const s = 98765432109876543210n;
+  const chainId = '0x534e5f4d41494e';
+  const poolAddress = '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a';
+  const viewingKey = ViewingKey.deriveFromSignature(r, s, chainId, poolAddress);
+
+  it('should return true for valid proof', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ valid: true }),
+    }));
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.verifyDisclosureProof({
+      type: 'full',
+      statement: 'test',
+      proof: '0xvalidproof',
+      publicInputs: ['0xinput'],
+      verifiedAt: Date.now(),
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should return false for expired proof', async () => {
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.verifyDisclosureProof({
+      type: 'auditor',
+      statement: 'test',
+      proof: '0xproof',
+      publicInputs: [],
+      verifiedAt: Date.now(),
+      expiresAt: Date.now() - 1000,
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false for missing proof', async () => {
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.verifyDisclosureProof({
+      type: 'none',
+      statement: 'test',
+      proof: '',
+      publicInputs: [],
+      verifiedAt: Date.now(),
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false when prover returns invalid', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ valid: false }),
+    }));
+
+    const prover = new ProvingService({ url: 'http://localhost:8080' });
+    const result = await prover.verifyDisclosureProof({
+      type: 'full',
+      statement: 'test',
+      proof: '0xproof',
+      publicInputs: [],
+      verifiedAt: Date.now(),
+    });
+
+    expect(result).toBe(false);
   });
 });

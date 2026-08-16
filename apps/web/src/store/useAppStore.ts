@@ -36,6 +36,24 @@ export interface ViewingKey {
   isActive: boolean;
 }
 
+export interface DisclosureProof {
+  id: string;
+  type: string;
+  statement: string;
+  proof: string;
+  publicInputs: string[];
+  verifiedAt: number;
+  expiresAt?: number;
+}
+
+export interface PoolActivityMetrics {
+  totalDeposits: number;
+  totalVolume: string;
+  activeUsers: number;
+  avgDepositSize: string;
+  lastUpdated: number;
+}
+
 export interface PrivateBalance {
   asset: string;
   symbol: string;
@@ -65,6 +83,14 @@ interface AppState {
   transactionHistory: IntentStatus[];
   setTransactionHistory: (history: IntentStatus[]) => void;
   addTransaction: (tx: IntentStatus) => void;
+
+  disclosureProofs: DisclosureProof[];
+  addDisclosureProof: (proof: DisclosureProof) => void;
+  removeDisclosureProof: (id: string) => void;
+  clearDisclosureProofs: () => void;
+
+  poolMetrics: PoolActivityMetrics | null;
+  setPoolMetrics: (metrics: PoolActivityMetrics | null) => void;
 }
 
 const initialIntent: Intent = {
@@ -121,4 +147,14 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       transactionHistory: [tx, ...state.transactionHistory].slice(0, 50),
     })),
+
+  disclosureProofs: [],
+  addDisclosureProof: (proof) =>
+    set((state) => ({ disclosureProofs: [proof, ...state.disclosureProofs].slice(0, 50) })),
+  removeDisclosureProof: (id) =>
+    set((state) => ({ disclosureProofs: state.disclosureProofs.filter((p) => p.id !== id) })),
+  clearDisclosureProofs: () => set({ disclosureProofs: [] }),
+
+  poolMetrics: null,
+  setPoolMetrics: (metrics) => set({ poolMetrics: metrics }),
 }));

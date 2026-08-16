@@ -1,32 +1,96 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, KeyRound, Eye, Copy, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Share2,
+  KeyRound,
+  Eye,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  Shield,
+  Trash2,
+  Fingerprint,
+} from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 
+type DisclosureType = "full" | "partial" | "amount" | "source" | "auditor" | "none";
+
+const DISCLOSURE_TYPES: { value: DisclosureType; label: string; description: string }[] = [
+  { value: "full", label: "Full Disclosure", description: "Reveal all shielded transaction details" },
+  { value: "partial", label: "Partial Disclosure", description: "Reveal only selected fields" },
+  { value: "amount", label: "Amount Proof", description: "Prove amount above/below a threshold" },
+  { value: "source", label: "Source Proof", description: "Prove funds originated from a specific address" },
+  { value: "auditor", label: "Auditor Access", description: "Grant an auditor viewing access" },
+  { value: "none", label: "No Disclosure", description: "Generate a null disclosure proof" },
+];
+
+const PARTIAL_FIELDS = [
+  "amount",
+  "timestamp",
+  "token",
+  "nullifier",
+  "noteHash",
+];
+
 export function SelectiveDisclosure() {
-  const { viewingKeys } = useAppStore();
+  const { viewingKeys, addDisclosureProof, removeDisclosureProof, disclosureProofs } = useAppStore();
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
-  const [disclosedTo, setDisclosedTo] = useState("");
-  const [isDisclosing, setIsDisclosing] = useState(false);
+  const [disclosureType, setDisclosureType] = useState<DisclosureType>("none");
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [threshold, setThreshold] = useState("");
+  const [operator, setOperator] = useState<string>("\u003e=");
+  const operatorOptions = [">=", "<=", ">", "<", "==", "!="] as const;
+  const [sourceAddress, setSourceAddress] = useState("");
+  const [auditorPublicKey, setAuditorPublicKey] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState("365");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const selectedKey = viewingKeys.find((k) => k.id === selectedKeyId);
 
-  const handleDisclose = async () => {
-    if (!selectedKey || !disclosedTo.trim()) return;
+  const hasActiveKey = viewingKeys.some((k) => k.isActive);
 
-    setIsDisclosing(true);
+  const handleGenerate = async () => {
+    if (!selectedKey) return;
+
+    setIsGenerating(true);
     setMessage(null);
 
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const proofId = crypto.randomUUID();
+    const now = Date.now();
+    const expiresAt =
+      disclosureType === "auditor" && expiresInDays
+        ? now + Number(expiresInDays) * 24 * 60 * 60 * 1000
+        : undefined;
+
+    const statement = buildStatement(disclosureType, {
+      fields: selectedFields,
+      threshold,
+      operator,
+      sourceAddress,
+      auditorPublicKey,
+      expiresAt,
+    });
+
+    addDisclosureProof({
+      id: proofId,
+      type: disclosureType,
+      statement,
+      proof: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(""),
+      publicInputs: ["0x" + Array(32).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join("")],
+      verifiedAt: now,
+      expiresAt,
+    });
 
     setMessage({
       type: "success",
-      text: `Viewing key disclosed to ${disclosedTo}. They can now view your shielded transactions.`,
+      text: `${DISCLOSURE_TYPES.find((t) => t.value === disclosureType)?.label ?? "Disclosure"} proof generated successfully.`,
     });
-    setDisclosedTo("");
-    setIsDisclosing(false);
+
+    setIsGenerating(false);
   };
 
   const handleCopy = (text: string) => {
@@ -59,12 +123,12 @@ export function SelectiveDisclosure() {
         </div>
       )}
 
-      {viewingKeys.length === 0 ? (
+      {!hasActiveKey ? (
         <div className="flex items-start gap-3 p-4 bg-zinc-800 rounded-lg border border-zinc-700">
           <KeyRound className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm text-zinc-300">
-              You need a viewing key to use selective disclosure.
+              You need an active viewing key to generate disclosure proofs.
             </p>
             <p className="text-xs text-zinc-500 mt-1">
               Register a viewing key in the panel above to get started.
@@ -83,11 +147,13 @@ export function SelectiveDisclosure() {
               className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             >
               <option value="">-- Select a key --</option>
-              {viewingKeys.map((key) => (
-                <option key={key.id} value={key.id}>
-                  {key.label}
-                </option>
-              ))}
+              {viewingKeys
+                .filter((k) => k.isActive)
+                .map((key) => (
+                  <option key={key.id} value={key.id}>
+                    {key.label}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -117,36 +183,225 @@ export function SelectiveDisclosure() {
 
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Disclose To (Address or Email)
+              Disclosure Type
             </label>
-            <input
-              type="text"
-              placeholder="0x... or email@example.com"
-              value={disclosedTo}
-              onChange={(e) => setDisclosedTo(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              {DISCLOSURE_TYPES.map((type) => (
+                <button
+                  key={type.value}
+                  onClick={() => setDisclosureType(type.value)}
+                  className={`p-3 rounded-lg border text-left transition-colors ${
+                    disclosureType === type.value
+                      ? "border-indigo-500 bg-indigo-500/10 text-white"
+                      : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-600"
+                  }`}
+                >
+                  <p className="text-sm font-medium">{type.label}</p>
+                  <p className="text-xs text-zinc-400 mt-1">{type.description}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
+          {disclosureType === "partial" && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
+                Fields to Disclose
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {PARTIAL_FIELDS.map((field) => (
+                  <button
+                    key={field}
+                    onClick={() =>
+                      setSelectedFields((prev) =>
+                        prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                      selectedFields.includes(field)
+                        ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
+                        : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600"
+                    }`}
+                  >
+                    {field}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {disclosureType === "amount" && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Threshold Amount (base units)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1000000000000000000"
+                  value={threshold}
+                  onChange={(e) => setThreshold(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Operator</label>
+                <div className="flex gap-2">
+                  {operatorOptions.map((op) => (
+                    <button
+                      key={op}
+                      onClick={() => setOperator(op)}
+                      className={`px-3 py-2 rounded-lg border text-sm font-mono transition-colors ${
+                        operator === op
+                          ? "border-indigo-500 bg-indigo-500/10 text-white"
+                          : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600"
+                      }`}
+                    >
+                      {op}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {disclosureType === "source" && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
+                Source Address
+              </label>
+              <input
+                type="text"
+                placeholder="0x..."
+                value={sourceAddress}
+                onChange={(e) => setSourceAddress(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+          )}
+
+          {disclosureType === "auditor" && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Auditor Public Key / Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={auditorPublicKey}
+                  onChange={(e) => setAuditorPublicKey(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Expires In (days)
+                </label>
+                <input
+                  type="text"
+                  placeholder="365"
+                  value={expiresInDays}
+                  onChange={(e) => setExpiresInDays(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={handleDisclose}
-            disabled={isDisclosing || !selectedKeyId || !disclosedTo.trim()}
+            onClick={handleGenerate}
+            disabled={isGenerating || !selectedKeyId}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg font-medium transition-colors"
           >
-            {isDisclosing ? (
+            {isGenerating ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Disclosing...
+                Generating Proof...
               </>
             ) : (
               <>
-                <Share2 className="w-4 h-4" />
-                Disclose Viewing Key
+                <Fingerprint className="w-4 h-4" />
+                Generate Disclosure Proof
               </>
             )}
           </button>
         </div>
       )}
+
+      {disclosureProofs.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-zinc-300">Generated Proofs</p>
+          {disclosureProofs.map((proof) => (
+            <div
+              key={proof.id}
+              className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-2"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span className="text-sm font-medium text-white capitalize">
+                    {proof.type} Disclosure
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeDisclosureProof(proof.id)}
+                  className="text-zinc-400 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-zinc-400">{proof.statement}</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-zinc-500 font-mono break-all flex-1">
+                  {proof.proof.slice(0, 32)}...
+                </code>
+                <button
+                  onClick={() => handleCopy(proof.proof)}
+                  className="text-xs text-zinc-400 hover:text-white transition-colors shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="flex items-center justify-between text-xs text-zinc-500">
+                <span>Generated {new Date(proof.verifiedAt).toLocaleString()}</span>
+                {proof.expiresAt && (
+                  <span>Expires {new Date(proof.expiresAt).toLocaleDateString()}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+function buildStatement(
+  type: DisclosureType,
+  opts: {
+    fields?: string[];
+    threshold?: string;
+    operator?: string;
+    sourceAddress?: string;
+    auditorPublicKey?: string;
+    expiresAt?: number;
+  }
+): string {
+  switch (type) {
+    case "full":
+      return "Prover owns a shielded note in the specified pool";
+    case "partial":
+      return `Prover discloses fields: ${opts.fields?.join(", ") ?? "selected"}`;
+    case "amount":
+      return `Prover proves amount ${opts.operator ?? ">="} ${opts.threshold ?? "0"}`;
+    case "source":
+      return `Prover proves funds originated from ${opts.sourceAddress}`;
+    case "auditor":
+      return `Prover grants auditor access until ${opts.expiresAt ? new Date(opts.expiresAt).toISOString() : "permanent"}`;
+    case "none":
+      return "No disclosure";
+    default:
+      return "Custom disclosure proof";
+  }
 }

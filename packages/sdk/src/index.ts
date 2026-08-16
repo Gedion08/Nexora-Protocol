@@ -55,6 +55,12 @@ export type {
   UnshieldResult,
   TransferResult,
   SupportedError,
+  DisclosureType,
+  DisclosureProof,
+  DisclosureProofParams,
+  PrivacyHealth,
+  PrivacyHealthFactor,
+  PoolActivityMetrics,
 } from './types';
 
 export {

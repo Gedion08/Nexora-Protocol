@@ -6,8 +6,9 @@ import { RouteSelector } from "@/components/intent/RouteSelector";
 import { TxTracker } from "@/components/transaction/TxTracker";
 import { TransactionHistory } from "@/components/transaction/TransactionHistory";
 import { PrivateBalance } from "@/components/balance/PrivateBalance";
-import { ViewingKeyFlow } from "@/components/viewing-key/ViewingKeyFlow";
 import { PrivacyHealthScore } from "@/components/balance/PrivacyHealthScore";
+import { PoolActivityMetrics } from "@/components/balance/PoolActivityMetrics";
+import { ViewingKeyFlow } from "@/components/viewing-key/ViewingKeyFlow";
 import { SelectiveDisclosure } from "@/components/viewing-key/SelectiveDisclosure";
 import { useAppStore } from "@/store/useAppStore";
 import { Sparkles, Shield, Zap } from "lucide-react";
@@ -76,6 +77,7 @@ export default function Home() {
           <div className="space-y-6">
             <PrivateBalance />
             <PrivacyHealthScore />
+            <PoolActivityMetrics />
             <ViewingKeyFlow />
             <SelectiveDisclosure />
           </div>

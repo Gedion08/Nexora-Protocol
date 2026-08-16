@@ -182,3 +182,47 @@ export interface UnshieldResult extends TransactionResult {
 }
 
 export type SupportedError = Error & { code?: ErrorCodeValue };
+
+export type DisclosureType = 'full' | 'partial' | 'amount' | 'source' | 'auditor' | 'none';
+
+export interface DisclosureProof {
+  type: DisclosureType;
+  statement: string;
+  proof: string;
+  publicInputs: string[];
+  verifiedAt: number;
+  expiresAt?: number;
+}
+
+export interface DisclosureProofParams {
+  type: DisclosureType;
+  viewingKey: ViewingKeyData;
+  poolAddress: string;
+  chainId: string;
+  fields?: string[];
+  threshold?: bigint;
+  operator?: '>=' | '<=' | '==' | '!=' | '>' | '<';
+  sourceAddress?: string;
+  auditorPublicKey?: string;
+  expiresAt?: number;
+  noteHash?: string;
+}
+
+export interface PrivacyHealthFactor {
+  label: string;
+  score: number;
+  description: string;
+}
+
+export interface PrivacyHealth {
+  score: number;
+  factors: PrivacyHealthFactor[];
+}
+
+export interface PoolActivityMetrics {
+  totalDeposits: number;
+  totalVolume: string;
+  activeUsers: number;
+  avgDepositSize: string;
+  lastUpdated: number;
+}

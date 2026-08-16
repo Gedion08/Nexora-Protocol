@@ -1,4 +1,10 @@
-import { ProvingServiceConfig, UnshieldProof, UnshieldProofParams } from '../types';
+import {
+  ProvingServiceConfig,
+  UnshieldProof,
+  UnshieldProofParams,
+  DisclosureProof,
+  DisclosureProofParams,
+} from '../types';
 import { ProverError, InvalidArgumentError } from '../utils/errors';
 
 export interface ProverResponse {
@@ -73,6 +79,85 @@ export class ProvingService {
     }
   }
 
+  async generateDisclosureProof(params: DisclosureProofParams): Promise<DisclosureProof> {
+    this.validateDisclosureParams(params);
+
+    const body: Record<string, unknown> = {
+      type: params.type,
+      viewing_key: {
+        public_key: params.viewingKey.publicKey.toString(),
+        private_key: params.viewingKey.privateKey.toString(),
+      },
+      pool_address: params.poolAddress,
+      chain_id: params.chainId,
+    };
+
+    if (params.type === 'partial' && params.fields && params.fields.length > 0) {
+      body.fields = params.fields;
+    }
+    if (params.type === 'amount') {
+      body.threshold = params.threshold?.toString();
+      body.operator = params.operator ?? '>=';
+    }
+    if (params.type === 'source') {
+      body.source_address = params.sourceAddress;
+    }
+    if (params.type === 'auditor') {
+      body.auditor_public_key = params.auditorPublicKey;
+      body.expires_at = params.expiresAt;
+    }
+    if (params.noteHash) {
+      body.note_hash = params.noteHash;
+    }
+
+    try {
+      const response = await this.request('/prove/disclosure', 'POST', body) as {
+        proof: string;
+        public_inputs: string[];
+        statement: string;
+      };
+
+      if (!response || !response.proof) {
+        throw new ProverError('Disclosure prover response missing proof field');
+      }
+
+      return {
+        type: params.type,
+        statement: response.statement ?? this.buildStatement(params),
+        proof: response.proof,
+        publicInputs: response.public_inputs ?? [],
+        verifiedAt: Date.now(),
+        expiresAt: params.expiresAt,
+      };
+    } catch (error) {
+      if (error instanceof ProverError || error instanceof InvalidArgumentError) {
+        throw error;
+      }
+      throw new ProverError('Disclosure proof generation failed: ' + (error as Error).message, error);
+    }
+  }
+
+  async verifyDisclosureProof(proof: DisclosureProof): Promise<boolean> {
+    if (!proof || !proof.proof) {
+      return false;
+    }
+    if (proof.expiresAt && proof.expiresAt < Date.now()) {
+      return false;
+    }
+
+    try {
+      const response = await this.request('/prove/verify', 'POST', {
+        proof: proof.proof,
+        public_inputs: proof.publicInputs,
+        type: proof.type,
+      }) as { valid: boolean };
+
+      return Boolean(response?.valid);
+    } catch {
+      return false;
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       const response = await this.request('/health', 'GET') as { status?: string; healthy?: boolean };
@@ -94,6 +179,49 @@ export class ProvingService {
     }
     if (!params.poolAddress) {
       throw new InvalidArgumentError('poolAddress is required for proof generation');
+    }
+  }
+
+  private validateDisclosureParams(params: DisclosureProofParams): void {
+    if (!params.type) {
+      throw new InvalidArgumentError('disclosure type is required');
+    }
+    if (!params.viewingKey) {
+      throw new InvalidArgumentError('viewingKey is required for disclosure proof');
+    }
+    if (!params.poolAddress) {
+      throw new InvalidArgumentError('poolAddress is required for disclosure proof');
+    }
+    if (!params.chainId) {
+      throw new InvalidArgumentError('chainId is required for disclosure proof');
+    }
+    if (params.type === 'amount' && params.threshold === undefined) {
+      throw new InvalidArgumentError('threshold is required for amount disclosure');
+    }
+    if (params.type === 'source' && !params.sourceAddress) {
+      throw new InvalidArgumentError('sourceAddress is required for source disclosure');
+    }
+    if (params.type === 'auditor' && !params.auditorPublicKey) {
+      throw new InvalidArgumentError('auditorPublicKey is required for auditor disclosure');
+    }
+  }
+
+  private buildStatement(params: DisclosureProofParams): string {
+    switch (params.type) {
+      case 'full':
+        return 'Prover owns a shielded note in the specified pool';
+      case 'partial':
+        return `Prover discloses fields: ${params.fields?.join(', ') ?? 'selected'}`;
+      case 'amount':
+        return `Prover proves amount ${params.operator ?? '>='} ${params.threshold?.toString() ?? '0'}`;
+      case 'source':
+        return `Prover proves funds originated from ${params.sourceAddress}`;
+      case 'auditor':
+        return `Prover grants auditor access until ${params.expiresAt ? new Date(params.expiresAt).toISOString() : 'permanent'}`;
+      case 'none':
+        return 'No disclosure';
+      default:
+        return 'Custom disclosure proof';
     }
   }
 
