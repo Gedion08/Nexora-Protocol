@@ -44,8 +44,9 @@ export default function Home() {
           </Reveal>
 
           <Reveal delay={0.2}>
-            <p className="text-zinc-400 text-lg sm:text-xl max-w-2xl mx-auto mb-12 leading-relaxed">
+            <p className="text-center text-zinc-400 text-lg sm:text-xl max-w-2xl mx-auto mb-12 leading-relaxed">
               Shield any token. Move it privately. Use it anywhere in DeFi.
+              <br className="hidden sm:block" />
               Compliant by design on Starknet.
             </p>
           </Reveal>
