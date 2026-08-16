@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Lock, CheckCircle2, AlertTriangle, XCircle, Shield } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -9,7 +9,7 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
-  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#eab308" : "#ef4444";
+  const color = score >= 80 ? "#3b82f6" : score >= 60 ? "#eab308" : "#ef4444";
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -18,8 +18,8 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#27272a"
-          strokeWidth="6"
+          stroke="#262626"
+          strokeWidth="5"
           fill="none"
         />
         <circle
@@ -27,7 +27,7 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
           cy={size / 2}
           r={radius}
           stroke={color}
-          strokeWidth="6"
+          strokeWidth="5"
           fill="none"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -52,15 +52,15 @@ function HealthFactor({
   description: string;
 }) {
   const Icon = score >= 80 ? CheckCircle2 : score >= 60 ? AlertTriangle : XCircle;
-  const color = score >= 80 ? "text-green-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
+  const color = score >= 80 ? "text-blue-500" : score >= 60 ? "text-yellow-500" : "text-red-500";
 
   return (
-    <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+    <div className="flex items-center justify-between p-3 bg-[#0f0f0f] border border-[#262626] rounded">
       <div>
         <p className="text-sm font-medium text-white">{label}</p>
-        <p className="text-xs text-zinc-400">{description}</p>
+        <p className="text-xs text-zinc-500">{description}</p>
       </div>
-      <Icon className={`w-5 h-5 ${color}`} />
+      <Icon className={`w-4 h-4 ${color}`} />
     </div>
   );
 }
@@ -102,12 +102,17 @@ function calculateDestinationReuse(hasActiveViewingKey: boolean): number {
 
 export function PrivacyHealthScore() {
   const { viewingKeys, balances, disclosureProofs } = useAppStore();
+  const [mounted, setMounted] = useState(false);
 
   const hasActiveViewingKey = viewingKeys.some((k) => k.isActive);
   const displayBalances = useMemo(() => balances.length > 0 ? balances : [], [balances]);
 
-  const now = useMemo(() => new Date(), []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
+  const now = useMemo(() => new Date(), []);
   const poolSize = useMemo(() => 1247 + ((now.getHours() * 7 + now.getMinutes()) % 100), [now]);
   const poolSizeScore = useMemo(() => calculatePoolSizeScore(poolSize), [poolSize]);
   const amountScore = useMemo(() => calculateAmountUniqueness(displayBalances), [displayBalances]);
@@ -127,7 +132,7 @@ export function PrivacyHealthScore() {
     {
       label: "Anonymity Set",
       score: poolSizeScore,
-      description: `${poolSize} deposits in pool`,
+      description: mounted ? `${poolSize} deposits in pool` : "Calculating...",
     },
     {
       label: "Amount Uniqueness",
@@ -140,7 +145,9 @@ export function PrivacyHealthScore() {
     {
       label: "Timing Uniqueness",
       score: timingScore,
-      description: `Transaction timing spread across ${now.getHours() % 24}h window`,
+      description: mounted
+        ? `Transaction timing spread across ${now.getHours() % 24}h window`
+        : "Calculating...",
     },
     {
       label: "Source Reuse",
@@ -157,9 +164,9 @@ export function PrivacyHealthScore() {
   const hasDisclosureProofs = disclosureProofs.length > 0;
 
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-6">
+    <div className="panel space-y-6">
       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-        <Shield className="w-5 h-5 text-indigo-400" />
+        <Shield className="w-5 h-5 text-blue-500" />
         Privacy Health Score
       </h3>
 
@@ -174,20 +181,20 @@ export function PrivacyHealthScore() {
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {factors.map((factor) => (
           <HealthFactor key={factor.label} {...factor} />
         ))}
       </div>
 
       {hasDisclosureProofs && (
-        <div className="flex items-start gap-3 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-          <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded">
+          <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-indigo-300 font-medium">
+            <p className="text-sm text-zinc-300 font-medium">
               Disclosure proofs active
             </p>
-            <p className="text-xs text-indigo-400/80 mt-1">
+            <p className="text-xs text-zinc-500 mt-1">
               {disclosureProofs.length} proof{disclosureProofs.length !== 1 ? "s" : ""} generated. Review them in the Selective Disclosure panel.
             </p>
           </div>
@@ -195,13 +202,13 @@ export function PrivacyHealthScore() {
       )}
 
       {!hasActiveViewingKey && (
-        <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-          <Lock className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded">
+          <Lock className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-yellow-300 font-medium">
+            <p className="text-sm text-zinc-300 font-medium">
               Improve your score
             </p>
-            <p className="text-xs text-yellow-400/80 mt-1">
+            <p className="text-xs text-zinc-500 mt-1">
               Register a viewing key and generate disclosure proofs to unlock your full privacy health score.
             </p>
           </div>

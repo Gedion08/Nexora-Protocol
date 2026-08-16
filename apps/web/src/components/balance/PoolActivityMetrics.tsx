@@ -3,26 +3,30 @@
 import { useState, useEffect } from "react";
 import { BarChart3, TrendingUp, Users, ArrowDownRight, RefreshCw } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { CountUp } from "@/components/animations/CountUp";
 
 const DEMO_METRICS = {
   totalDeposits: 3847,
   totalVolume: "12,450.00",
   activeUsers: 892,
   avgDepositSize: "3.24",
-  lastUpdated: Date.now(),
+  lastUpdated: 0,
 };
 
 export function PoolActivityMetrics() {
   const { poolMetrics, setPoolMetrics } = useAppStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const metrics = poolMetrics ?? DEMO_METRICS;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     if (!poolMetrics) {
-      setPoolMetrics(DEMO_METRICS);
+      setPoolMetrics({ ...DEMO_METRICS, lastUpdated: Date.now() });
     }
   }, [poolMetrics, setPoolMetrics]);
+
+  const metrics = poolMetrics ?? DEMO_METRICS;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -44,64 +48,73 @@ export function PoolActivityMetrics() {
     return vol;
   };
 
+  const displayLastUpdated = mounted && metrics.lastUpdated
+    ? new Date(metrics.lastUpdated).toLocaleString()
+    : "Loading...";
+
+  const items = [
+    {
+      label: "Deposits",
+      value: <CountUp end={metrics.totalDeposits} />,
+      sub: "All time",
+      icon: ArrowDownRight,
+    },
+    {
+      label: "Volume",
+      value: formatVolume(metrics.totalVolume),
+      sub: "ETH shielded",
+      icon: TrendingUp,
+    },
+    {
+      label: "Active Users",
+      value: <CountUp end={metrics.activeUsers} />,
+      sub: "Last 24h",
+      icon: Users,
+    },
+    {
+      label: "Avg Deposit",
+      value: metrics.avgDepositSize,
+      sub: "ETH per tx",
+      icon: BarChart3,
+    },
+  ];
+
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="panel">
+      <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-indigo-400" />
+          <BarChart3 className="w-5 h-5 text-blue-500" />
           Pool Activity
         </h3>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="text-zinc-400 hover:text-white transition-colors disabled:text-zinc-600"
+          className="text-zinc-500 hover:text-white transition-colors disabled:text-zinc-700"
         >
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-1">
-          <div className="flex items-center gap-2 text-zinc-400">
-            <ArrowDownRight className="w-4 h-4" />
-            <span className="text-xs font-medium">Deposits</span>
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="p-5 bg-[#0f0f0f] border border-[#262626] rounded space-y-1.5 hover:border-blue-500/20 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-zinc-500">
+              <item.icon className="w-3.5 h-3.5" />
+              <span className="text-[11px] mono uppercase tracking-wider">{item.label}</span>
+            </div>
+            <p className="text-2xl font-bold text-white mono">{item.value}</p>
+            <p className="text-[11px] text-zinc-600 mono">{item.sub}</p>
           </div>
-          <p className="text-xl font-bold text-white">{metrics.totalDeposits.toLocaleString()}</p>
-          <p className="text-xs text-zinc-500">All time</p>
-        </div>
-
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-1">
-          <div className="flex items-center gap-2 text-zinc-400">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-xs font-medium">Volume</span>
-          </div>
-          <p className="text-xl font-bold text-white">{formatVolume(metrics.totalVolume)}</p>
-          <p className="text-xs text-zinc-500">ETH shielded</p>
-        </div>
-
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-1">
-          <div className="flex items-center gap-2 text-zinc-400">
-            <Users className="w-4 h-4" />
-            <span className="text-xs font-medium">Active Users</span>
-          </div>
-          <p className="text-xl font-bold text-white">{metrics.activeUsers.toLocaleString()}</p>
-          <p className="text-xs text-zinc-500">Last 24h</p>
-        </div>
-
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-1">
-          <div className="flex items-center gap-2 text-zinc-400">
-            <BarChart3 className="w-4 h-4" />
-            <span className="text-xs font-medium">Avg Deposit</span>
-          </div>
-          <p className="text-xl font-bold text-white">{metrics.avgDepositSize}</p>
-          <p className="text-xs text-zinc-500">ETH per tx</p>
-        </div>
+        ))}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-zinc-500">
-        <span>Last updated: {new Date(metrics.lastUpdated).toLocaleString()}</span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
+      <div className="flex items-center justify-between text-[11px] text-zinc-600 mono mt-4">
+        <span>Last updated: {displayLastUpdated}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" style={{ boxShadow: "0 0 6px rgba(59,130,246,0.5)" }} />
           Live
         </span>
       </div>

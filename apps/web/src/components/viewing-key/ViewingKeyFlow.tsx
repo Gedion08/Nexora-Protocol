@@ -42,9 +42,9 @@ export function ViewingKeyFlow() {
   };
 
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-6">
+    <div className="panel space-y-6">
       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-        <KeyRound className="w-5 h-5 text-indigo-400" />
+        <KeyRound className="w-5 h-5 text-blue-500" />
         Viewing Keys
       </h3>
 
@@ -53,25 +53,25 @@ export function ViewingKeyFlow() {
           {viewingKeys.map((key) => (
             <div
               key={key.id}
-              className="flex items-start justify-between p-4 bg-zinc-800 rounded-lg border border-zinc-700"
+              className="flex items-start justify-between p-4 bg-[#0f0f0f] border border-[#262626] rounded"
             >
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center shrink-0">
-                  <Eye className="w-5 h-5 text-green-400" />
+                <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center shrink-0">
+                  <Eye className="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="font-medium text-white">{key.label}</p>
-                  <p className="text-xs text-zinc-400 font-mono mt-1">
+                  <p className="font-medium text-white text-sm">{key.label}</p>
+                  <p className="text-xs text-zinc-500 mono mt-1">
                     VK: {key.viewingKey.slice(0, 20)}...
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-zinc-600 mono mt-1">
                     Registered {key.createdAt.toLocaleDateString()}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => handleDeactivate(key.id)}
-                className="text-xs text-red-400 hover:text-red-300 px-3 py-1 border border-red-400/30 rounded-md hover:bg-red-400/10 transition-colors"
+                className="text-[11px] mono uppercase tracking-wider text-red-400 hover:text-red-300 px-3 py-1.5 border border-red-500/20 rounded hover:bg-red-500/5 transition-colors"
               >
                 Revoke
               </button>
@@ -79,9 +79,9 @@ export function ViewingKeyFlow() {
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-            <Shield className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 p-4 bg-[#0f0f0f] border border-[#262626] rounded">
+            <Shield className="w-5 h-5 text-zinc-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-zinc-300">
                 Viewing keys allow you to decrypt and view your shielded transaction
@@ -91,19 +91,17 @@ export function ViewingKeyFlow() {
           </div>
 
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-zinc-300">
-              Key Label
-            </label>
+            <label className="block text-sm text-zinc-300">Key Label</label>
             <input
               type="text"
               placeholder="e.g., Main Wallet Viewer"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
             />
             {error && (
-              <p className="text-sm text-red-400 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
+              <p className="text-xs text-red-400 flex items-center gap-1.5 mono">
+                <AlertCircle className="w-3.5 h-3.5" />
                 {error}
               </p>
             )}
@@ -112,7 +110,7 @@ export function ViewingKeyFlow() {
           <button
             onClick={handleRegister}
             disabled={isRegistering}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-700 text-white rounded-lg font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded font-medium transition-colors"
           >
             {isRegistering ? (
               <>

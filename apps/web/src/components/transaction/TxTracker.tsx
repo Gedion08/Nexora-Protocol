@@ -60,37 +60,37 @@ export function TxTracker() {
 
   const getStatusIcon = (stepKey: string, index: number) => {
     if (index < currentStepIndex) {
-      return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+      return <CheckCircle2 className="w-5 h-5 text-green-500" />;
     }
     if (index === currentStepIndex) {
       if (intent.status === "failed") {
-        return <AlertCircle className="w-5 h-5 text-red-400" />;
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
       }
-      return <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />;
+      return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
     }
-    return <Circle className="w-5 h-5 text-zinc-600" />;
+    return <Circle className="w-5 h-5 text-zinc-700" />;
   };
 
   const getStatusLabel = (stepKey: string, index: number) => {
     if (index < currentStepIndex) {
-      return "text-green-400";
+      return "text-green-500";
     }
     if (index === currentStepIndex) {
       if (intent.status === "failed") {
-        return "text-red-400";
+        return "text-red-500";
       }
-      return "text-indigo-400";
+      return "text-blue-500";
     }
-    return "text-zinc-500";
+    return "text-zinc-600";
   };
 
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-6">
+    <div className="panel space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Transaction Status</h3>
         <div className="flex items-center gap-3">
           {isPolling && (
-            <span className="text-xs text-zinc-400 flex items-center gap-1">
+            <span className="text-[11px] text-zinc-500 flex items-center gap-1.5 mono">
               <Loader2 className="w-3 h-3 animate-spin" />
               Polling...
             </span>
@@ -100,9 +100,9 @@ export function TxTracker() {
               href={`https://starkscan.co/tx/${intent.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300"
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 mono"
             >
-              View on Starkscan <ExternalLink className="w-3 h-3" />
+              Starkscan <ExternalLink className="w-3 h-3" />
             </a>
           )}
         </div>
@@ -114,17 +114,17 @@ export function TxTracker() {
             <div className="relative">
               {index < STATUS_STEPS.length - 1 && (
                 <div
-                  className={`absolute top-1/2 left-1/2 w-full h-0.5 -translate-y-1/2 ${
-                    index < currentStepIndex ? "bg-green-400" : "bg-zinc-700"
+                  className={`absolute top-1/2 left-1/2 h-px -translate-y-1/2 ${
+                    index < currentStepIndex ? "bg-blue-500" : "bg-[#262626]"
                   }`}
-                  style={{ width: "100%", left: "50%", zIndex: 0 }}
+                  style={{ width: "100%", left: "50%" }}
                 />
               )}
               <div className="relative z-10 flex items-center justify-center">
                 {getStatusIcon(step.key, index)}
               </div>
             </div>
-            <span className={`text-xs font-medium ${getStatusLabel(step.key, index)}`}>
+            <span className={`text-[11px] font-medium mono ${getStatusLabel(step.key, index)}`}>
               {step.label}
             </span>
           </div>
@@ -132,21 +132,21 @@ export function TxTracker() {
       </div>
 
       {intent.status === "failed" && (
-        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-          <p className="text-sm text-red-300">
+        <div className="flex items-center gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <p className="text-sm text-red-400">
             Transaction failed. Please try again or contact support.
           </p>
         </div>
       )}
 
       {intent.status === "confirmed" && (
-        <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+        <div className="flex items-center gap-3 p-3 bg-green-500/5 border border-green-500/20 rounded">
+          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
           <div>
-            <p className="text-sm text-green-300 font-medium">Transaction Confirmed</p>
+            <p className="text-sm text-green-400 font-medium">Transaction Confirmed</p>
             {intent.txHash && (
-              <p className="text-xs text-green-400/80 font-mono mt-1">
+              <p className="text-[11px] text-green-500/70 mono mt-1">
                 {intent.txHash.slice(0, 20)}...
               </p>
             )}
@@ -155,9 +155,9 @@ export function TxTracker() {
       )}
 
       {(intent.status === "submitted_onchain" || intent.status === "building" || intent.status === "signing") && (
-        <div className="flex items-center gap-2 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-          <Loader2 className="w-5 h-5 text-indigo-400 animate-spin shrink-0" />
-          <p className="text-sm text-indigo-300">
+        <div className="flex items-center gap-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded">
+          <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+          <p className="text-sm text-zinc-300">
             {intent.status === "building" && "Building transaction..."}
             {intent.status === "signing" && "Awaiting signature..."}
             {intent.status === "submitted_onchain" && "Transaction submitted. Waiting for confirmation..."}
@@ -173,9 +173,9 @@ export function TxTracker() {
           }
           updateIntent({ status: "draft" });
         }}
-        className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
+        className="flex items-center gap-2 text-xs text-zinc-500 hover:text-white transition-colors mono uppercase tracking-wider"
       >
-        <RefreshCw className="w-4 h-4" />
+        <RefreshCw className="w-3.5 h-3.5" />
         New Intent
       </button>
     </div>

@@ -39,8 +39,7 @@ export function SelectiveDisclosure() {
   const [disclosureType, setDisclosureType] = useState<DisclosureType>("none");
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [threshold, setThreshold] = useState("");
-  const [operator, setOperator] = useState<string>("\u003e=");
-  const operatorOptions = [">=", "<=", ">", "<", "==", "!="] as const;
+  const [operator, setOperator] = useState<string>(">=");
   const [sourceAddress, setSourceAddress] = useState("");
   const [auditorPublicKey, setAuditorPublicKey] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("365");
@@ -48,7 +47,6 @@ export function SelectiveDisclosure() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const selectedKey = viewingKeys.find((k) => k.id === selectedKeyId);
-
   const hasActiveKey = viewingKeys.some((k) => k.isActive);
 
   const handleGenerate = async () => {
@@ -99,19 +97,21 @@ export function SelectiveDisclosure() {
     setTimeout(() => setMessage(null), 2000);
   };
 
+  const operatorOptions = [">=", "<=", ">", "<", "==", "!="] as const;
+
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-6 space-y-6">
+    <div className="panel space-y-6">
       <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-        <Share2 className="w-5 h-5 text-indigo-400" />
+        <Share2 className="w-5 h-5 text-blue-500" />
         Selective Disclosure
       </h3>
 
       {message && (
         <div
-          className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
+          className={`flex items-center gap-2 p-3 rounded text-sm mono ${
             message.type === "success"
-              ? "bg-green-500/10 border border-green-500/30 text-green-300"
-              : "bg-red-500/10 border border-red-500/30 text-red-300"
+              ? "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+              : "bg-red-500/10 border border-red-500/20 text-red-400"
           }`}
         >
           {message.type === "success" ? (
@@ -124,27 +124,25 @@ export function SelectiveDisclosure() {
       )}
 
       {!hasActiveKey ? (
-        <div className="flex items-start gap-3 p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <KeyRound className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-[#0f0f0f] border border-[#262626] rounded">
+          <KeyRound className="w-5 h-5 text-zinc-600 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm text-zinc-300">
               You need an active viewing key to generate disclosure proofs.
             </p>
-            <p className="text-xs text-zinc-500 mt-1">
+            <p className="text-xs text-zinc-600 mt-1">
               Register a viewing key in the panel above to get started.
             </p>
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Select Viewing Key
-            </label>
+            <label className="block text-sm text-zinc-300 mb-2">Select Viewing Key</label>
             <select
               value={selectedKeyId || ""}
               onChange={(e) => setSelectedKeyId(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors mono text-sm"
             >
               <option value="">-- Select a key --</option>
               {viewingKeys
@@ -158,46 +156,44 @@ export function SelectiveDisclosure() {
           </div>
 
           {selectedKey && (
-            <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-3">
+            <div className="p-4 bg-[#0f0f0f] border border-[#262626] rounded space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-white">Viewing Key Details</p>
                 <button
                   onClick={() => handleCopy(selectedKey.viewingKey)}
-                  className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white transition-colors"
+                  className="flex items-center gap-1 text-[11px] mono uppercase tracking-wider text-zinc-500 hover:text-white transition-colors"
                 >
                   <Copy className="w-3 h-3" />
                   Copy
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-zinc-500" />
-                <code className="text-xs text-zinc-400 font-mono break-all">
+                <Eye className="w-4 h-4 text-zinc-600" />
+                <code className="text-xs text-zinc-500 mono break-all">
                   {selectedKey.viewingKey}
                 </code>
               </div>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-600 mono">
                 Public Key: {selectedKey.publicKey.slice(0, 20)}...
               </p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Disclosure Type
-            </label>
+            <label className="block text-sm text-zinc-300 mb-2">Disclosure Type</label>
             <div className="grid grid-cols-2 gap-2">
               {DISCLOSURE_TYPES.map((type) => (
                 <button
                   key={type.value}
                   onClick={() => setDisclosureType(type.value)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
+                  className={`p-3 rounded border text-left transition-all ${
                     disclosureType === type.value
-                      ? "border-indigo-500 bg-indigo-500/10 text-white"
-                      : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-600"
+                      ? "border-blue-500 bg-blue-500/10 text-white"
+                      : "border-[#262626] bg-[#0f0f0f] text-zinc-400 hover:border-zinc-700"
                   }`}
                 >
                   <p className="text-sm font-medium">{type.label}</p>
-                  <p className="text-xs text-zinc-400 mt-1">{type.description}</p>
+                  <p className="text-[11px] text-zinc-500 mt-1 leading-snug">{type.description}</p>
                 </button>
               ))}
             </div>
@@ -205,9 +201,7 @@ export function SelectiveDisclosure() {
 
           {disclosureType === "partial" && (
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Fields to Disclose
-              </label>
+              <label className="block text-sm text-zinc-300 mb-2">Fields to Disclose</label>
               <div className="flex flex-wrap gap-2">
                 {PARTIAL_FIELDS.map((field) => (
                   <button
@@ -217,10 +211,10 @@ export function SelectiveDisclosure() {
                         prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]
                       )
                     }
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded border text-xs mono transition-all ${
                       selectedFields.includes(field)
-                        ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                        : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600"
+                        ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                        : "border-[#262626] bg-[#0f0f0f] text-zinc-500 hover:border-zinc-700"
                     }`}
                   >
                     {field}
@@ -231,30 +225,28 @@ export function SelectiveDisclosure() {
           )}
 
           {disclosureType === "amount" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Threshold Amount (base units)
-                </label>
+                <label className="block text-sm text-zinc-300 mb-2">Threshold Amount (base units)</label>
                 <input
                   type="text"
                   placeholder="e.g. 1000000000000000000"
                   value={threshold}
                   onChange={(e) => setThreshold(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 mono text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Operator</label>
-                <div className="flex gap-2">
+                <label className="block text-sm text-zinc-300 mb-2">Operator</label>
+                <div className="flex flex-wrap gap-2">
                   {operatorOptions.map((op) => (
                     <button
                       key={op}
                       onClick={() => setOperator(op)}
-                      className={`px-3 py-2 rounded-lg border text-sm font-mono transition-colors ${
+                      className={`px-3 py-2 rounded border text-sm mono transition-all ${
                         operator === op
-                          ? "border-indigo-500 bg-indigo-500/10 text-white"
-                          : "border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600"
+                          ? "border-blue-500 bg-blue-500/10 text-white"
+                          : "border-[#262626] bg-[#0f0f0f] text-zinc-500 hover:border-zinc-700"
                       }`}
                     >
                       {op}
@@ -267,43 +259,37 @@ export function SelectiveDisclosure() {
 
           {disclosureType === "source" && (
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Source Address
-              </label>
+              <label className="block text-sm text-zinc-300 mb-2">Source Address</label>
               <input
                 type="text"
                 placeholder="0x..."
                 value={sourceAddress}
                 onChange={(e) => setSourceAddress(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 mono text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
               />
             </div>
           )}
 
           {disclosureType === "auditor" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Auditor Public Key / Address
-                </label>
+                <label className="block text-sm text-zinc-300 mb-2">Auditor Public Key / Address</label>
                 <input
                   type="text"
                   placeholder="0x..."
                   value={auditorPublicKey}
                   onChange={(e) => setAuditorPublicKey(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 mono text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Expires In (days)
-                </label>
+                <label className="block text-sm text-zinc-300 mb-2">Expires In (days)</label>
                 <input
                   type="text"
                   placeholder="365"
                   value={expiresInDays}
                   onChange={(e) => setExpiresInDays(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 mono text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
                 />
               </div>
             </div>
@@ -312,7 +298,7 @@ export function SelectiveDisclosure() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !selectedKeyId}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded font-medium transition-colors"
           >
             {isGenerating ? (
               <>
@@ -331,39 +317,39 @@ export function SelectiveDisclosure() {
 
       {disclosureProofs.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm font-medium text-zinc-300">Generated Proofs</p>
+          <p className="text-sm text-zinc-300 mono uppercase tracking-wider">Generated Proofs</p>
           {disclosureProofs.map((proof) => (
             <div
               key={proof.id}
-              className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-2"
+              className="p-4 bg-[#0f0f0f] border border-[#262626] rounded space-y-2"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <Shield className="w-4 h-4 text-blue-500 shrink-0" />
                   <span className="text-sm font-medium text-white capitalize">
                     {proof.type} Disclosure
                   </span>
                 </div>
                 <button
                   onClick={() => removeDisclosureProof(proof.id)}
-                  className="text-zinc-400 hover:text-red-400 transition-colors"
+                  className="text-zinc-600 hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-zinc-400">{proof.statement}</p>
+              <p className="text-xs text-zinc-500">{proof.statement}</p>
               <div className="flex items-center gap-2">
-                <code className="text-xs text-zinc-500 font-mono break-all flex-1">
+                <code className="text-xs text-zinc-600 mono break-all flex-1">
                   {proof.proof.slice(0, 32)}...
                 </code>
                 <button
                   onClick={() => handleCopy(proof.proof)}
-                  className="text-xs text-zinc-400 hover:text-white transition-colors shrink-0"
+                  className="text-xs text-zinc-500 hover:text-white transition-colors shrink-0"
                 >
                   <Copy className="w-3 h-3" />
                 </button>
               </div>
-              <div className="flex items-center justify-between text-xs text-zinc-500">
+              <div className="flex items-center justify-between text-[11px] text-zinc-600 mono">
                 <span>Generated {new Date(proof.verifiedAt).toLocaleString()}</span>
                 {proof.expiresAt && (
                   <span>Expires {new Date(proof.expiresAt).toLocaleDateString()}</span>

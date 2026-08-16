@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowRight, Shield, Zap, Globe } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
-import { relayerApi, type QuoteResult } from "@/lib/relayer-api";
+import { relayerApi } from "@/lib/relayer-api";
 import type { RouteOption } from "@/store/useAppStore";
 
 const CHAINS = [
@@ -62,8 +62,8 @@ export function IntentForm() {
       const routes = await buildRoutesFromRelayer();
       setRoutes(routes);
       selectRoute(routes[1]);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch routes");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch routes");
       updateIntent({ status: "draft" });
     } finally {
       setIsSubmitting(false);
@@ -145,133 +145,122 @@ export function IntentForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
-          {error}
-        </div>
-      )}
+    <div className="panel">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-400 mono">
+            {error}
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            From Chain
-          </label>
-          <select
-            value={intent.fromChain}
-            onChange={(e) => updateIntent({ fromChain: e.target.value })}
-            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            {CHAINS.map((chain) => (
-              <option key={chain.id} value={chain.id}>
-                {chain.icon} {chain.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-zinc-300 mb-2">From Chain</label>
+            <select
+              value={intent.fromChain}
+              onChange={(e) => updateIntent({ fromChain: e.target.value })}
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors mono text-sm"
+            >
+              {CHAINS.map((chain) => (
+                <option key={chain.id} value={chain.id}>
+                  {chain.icon} {chain.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            To Chain
-          </label>
-          <select
-            value={intent.toChain}
-            onChange={(e) => updateIntent({ toChain: e.target.value })}
-            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            {CHAINS.map((chain) => (
-              <option key={chain.id} value={chain.id}>
-                {chain.icon} {chain.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Asset
-          </label>
-          <select
-            value={intent.asset}
-            onChange={(e) => updateIntent({ asset: e.target.value })}
-            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            {ASSETS.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.symbol} - {asset.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="block text-sm text-zinc-300 mb-2">To Chain</label>
+            <select
+              value={intent.toChain}
+              onChange={(e) => updateIntent({ toChain: e.target.value })}
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors mono text-sm"
+            >
+              {CHAINS.map((chain) => (
+                <option key={chain.id} value={chain.id}>
+                  {chain.icon} {chain.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-zinc-300 mb-2">Asset</label>
+            <select
+              value={intent.asset}
+              onChange={(e) => updateIntent({ asset: e.target.value })}
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors mono text-sm"
+            >
+              {ASSETS.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.symbol} - {asset.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-300 mb-2">Amount</label>
+            <input
+              type="number"
+              step="0.0001"
+              placeholder="0.0"
+              value={intent.amount}
+              onChange={(e) => updateIntent({ amount: e.target.value })}
+              className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors mono text-sm"
+            />
+          </div>
+        </div>
+
         <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Amount
-          </label>
+          <label className="block text-sm text-zinc-300 mb-2">Recipient Address</label>
           <input
-            type="number"
-            step="0.0001"
-            placeholder="0.0"
-            value={intent.amount}
-            onChange={(e) => updateIntent({ amount: e.target.value })}
-            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            type="text"
+            placeholder="0x..."
+            value={intent.recipient}
+            onChange={(e) => updateIntent({ recipient: e.target.value })}
+            className="w-full px-4 py-3 bg-[#0f0f0f] border border-[#262626] rounded text-white placeholder-zinc-600 mono text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500/50 transition-colors"
           />
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Recipient Address
-        </label>
-        <input
-          type="text"
-          placeholder="0x..."
-          value={intent.recipient}
-          onChange={(e) => updateIntent({ recipient: e.target.value })}
-          className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-3">
-          Privacy Level
-        </label>
-        <div className="grid grid-cols-3 gap-3">
-          {PRIVACY_LEVELS.map((level) => (
-            <button
-              key={level.id}
-              type="button"
-              onClick={() => updateIntent({ privacyLevel: level.id as "public" | "private" | "shielded" })}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                intent.privacyLevel === level.id
-                  ? "border-indigo-500 bg-indigo-500/10"
-                  : "border-zinc-700 hover:border-zinc-600 bg-zinc-800"
-              }`}
-            >
-              <level.icon className="w-5 h-5 mx-auto mb-2 text-indigo-400" />
-              <p className="text-sm font-medium text-white">{level.label}</p>
-              <p className="text-xs text-zinc-400 mt-1">{level.description}</p>
-            </button>
-          ))}
+        <div>
+          <label className="block text-sm text-zinc-300 mb-3">Privacy Level</label>
+          <div className="grid grid-cols-3 gap-3">
+            {PRIVACY_LEVELS.map((level) => (
+              <button
+                key={level.id}
+                type="button"
+                onClick={() => updateIntent({ privacyLevel: level.id as "public" | "private" | "shielded" })}
+                className={`p-4 rounded border transition-all ${
+                  intent.privacyLevel === level.id
+                    ? "border-blue-500 bg-blue-500/10"
+                    : "border-[#262626] bg-[#0f0f0f] hover:border-zinc-700"
+                }`}
+              >
+                <level.icon className={`w-5 h-5 mx-auto mb-2 ${intent.privacyLevel === level.id ? "text-blue-500" : "text-zinc-500"}`} />
+                <p className="text-sm font-medium text-white">{level.label}</p>
+                <p className="text-[11px] text-zinc-500 mt-1">{level.description}</p>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <button
-        type="submit"
-        disabled={isSubmitting || !intent.amount || !intent.recipient}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg font-medium transition-colors"
-      >
-        {isSubmitting ? (
-          "Finding routes..."
-        ) : (
-          <>
-            Find Routes <ArrowRight className="w-4 h-4" />
-          </>
-        )}
-      </button>
-    </form>
+        <button
+          type="submit"
+          disabled={isSubmitting || !intent.amount || !intent.recipient}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded font-medium transition-colors"
+        >
+          {isSubmitting ? (
+            "Finding routes..."
+          ) : (
+            <>
+              Find Routes <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
+    </div>
   );
 }
-
