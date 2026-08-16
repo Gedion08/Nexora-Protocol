@@ -26,6 +26,9 @@ function networkName(network: string, environment: string): string {
   const env = environment === 'SEPOLIA' ? '_SEPOLIA' : '_MAINNET';
   if (network === 'ARBITRUM') return `ARBITRUM${env}`;
   if (network === 'STARKNET') return `STARKNET${env}`;
+  if (network === 'BASE') return `BASE${env}`;
+  if (network === 'ETHEREUM') return `ETHEREUM${env}`;
+  if (network === 'OPTIMISM') return `OPTIMISM${env}`;
   return `${network}${env}`;
 }
 
@@ -142,7 +145,7 @@ export class LayerSwapClient {
     return { minAmount: limits.min_amount, maxAmount: limits.max_amount };
   }
 
-  async createSwap(sourceNetwork: string, sourceToken: string, destinationNetwork: string, destinationToken: string, amount: number, destinationAddress: string, sourceAddress?: string, refuel = false): Promise<BridgeReservation> {
+  async createSwap(sourceNetwork: string, sourceToken: string, destinationNetwork: string, destinationToken: string, amount: number, destinationAddress: string, sourceAddress?: string, refuel = false, refundAddress?: string, referenceId?: string): Promise<BridgeReservation> {
     const body: Record<string, unknown> = {
       source_network: networkName(sourceNetwork, this.environment),
       source_token: sourceToken,
@@ -155,6 +158,12 @@ export class LayerSwapClient {
     };
     if (sourceAddress) {
       body.source_address = sourceAddress;
+    }
+    if (refundAddress) {
+      body.refund_address = refundAddress;
+    }
+    if (referenceId) {
+      body.metadata = { reference_id: referenceId };
     }
     const response = await this.post<LsSwapResponse>('/api/v2/swaps', body);
     return this.mapSwapResponse(response);
@@ -236,6 +245,8 @@ export class LayerSwapClient {
       amount: response.swap.requested_amount,
       destinationAddress: response.swap.destination_address,
       depositAddress: response.swap.metadata?.deposit_address ?? '',
+      refundAddress: response.swap.metadata?.refund_address ?? undefined,
+      referenceId: response.swap.metadata?.reference_id ?? undefined,
       status: response.swap.status,
       depositActions: response.deposit_actions.map((a) => ({
         type: a.type,
@@ -371,6 +382,7 @@ interface LsSwap {
     exchange_account?: string | null;
     sequence_number: number;
     deposit_address?: string;
+    refund_address?: string;
   };
   transactions: LsTransaction[];
 }

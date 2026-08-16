@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#18181b"/>
+  <rect x="40" y="40" width="1120" height="595" rx="12" fill="#27272a"/>
+  <text x="600" y="337" font-family="sans-serif" font-size="24" fill="#71717a" text-anchor="middle">Screenshot: Selective Disclosure</text>
+  <text x="600" y="377" font-family="sans-serif" font-size="14" fill="#52525b" text-anchor="middle">Add real screenshot at docs/screenshots/selective-disclosure.png</text>
+</svg>

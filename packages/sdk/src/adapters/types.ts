@@ -13,6 +13,41 @@ export interface ArbitrumAdapterConfig extends AdapterConfig {
   defaultToken?: string;
 }
 
+export interface BaseAdapterConfig extends AdapterConfig {
+  sourceNetwork?: 'STARKNET';
+  destinationNetwork?: 'BASE';
+  defaultToken?: string;
+}
+
+export interface FreshAddressResult {
+  address: string;
+  privateKey: string;
+}
+
+export interface WithdrawalParams {
+  token: string;
+  amount: number;
+  recipient?: string;
+  privacyLevel?: 'none' | 'standard' | 'maximum';
+  referenceId?: string;
+}
+
+export interface WithdrawalReceipt {
+  swapId: string;
+  depositAddress: string;
+  destinationAddress: string;
+  depositActions: DepositAction[];
+  fee: number;
+  amount: number;
+  sourceToken: string;
+  destinationToken: string;
+  status: string;
+  unshieldTxHash?: string;
+  bridgeTxHash?: string;
+  estimatedArrival?: string;
+  freshAddress: string;
+}
+
 export interface BridgeQuote {
   sourceNetwork: string;
   sourceToken: string;
@@ -37,6 +72,8 @@ export interface BridgeReservation {
   amount: number;
   destinationAddress: string;
   depositAddress: string;
+  refundAddress?: string;
+  referenceId?: string;
   status: string;
   depositActions: DepositAction[];
   fee: number;

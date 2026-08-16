@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: nexora-relayer
+    env: docker
+    region: ohio
+    plan: starter
+    branch: main
+    dockerfilePath: ./packages/relayer/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    healthCheckTimeout: 100
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXORA_ENV
+        value: MAINNET
+      - key: POLL_INTERVAL_MS
+        value: "15000"
+      - key: TX_WAIT_TIMEOUT_MS
+        value: "120000"
+      - key: MAX_RETRIES
+        value: "3"
+      - key: LOG_LEVEL
+        value: info

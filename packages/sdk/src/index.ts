@@ -8,10 +8,11 @@ export { PrivateTransferBuilder } from './privacy/private-transfer';
 export { NoteDiscovery, IndexerDiscoveryProvider } from './privacy/discovery';
 export { ProvingService } from './privacy/prover';
 
-export { LayerSwapClient, LayerSwapApiError, ArbitrumAdapter } from './adapters';
+export { LayerSwapClient, LayerSwapApiError, ArbitrumAdapter, BaseAdapter, StarknetAccountGenerator, CrossChainFlow } from './adapters';
 export type {
   AdapterConfig,
   ArbitrumAdapterConfig,
+  BaseAdapterConfig,
   BridgeQuote,
   BridgeReservation,
   DepositAction,
@@ -20,6 +21,14 @@ export type {
   BridgeToken,
   BridgeNetwork,
   NetworkEnvironment,
+  FreshAddressResult,
+  WithdrawalParams,
+  WithdrawalReceipt,
+  DeterministicAccountParams,
+  CrossChainFlowConfig,
+  CrossChainReceipt,
+  CrossChainStatus,
+  StarknetAccount,
 } from './adapters';
 
 export type {
@@ -78,6 +87,9 @@ export type { ErrorCodeValue } from './utils/errors';
 export {
   deriveViewingKey,
   deriveDeterministicAccountKey,
+  deriveStarknetPrivateKeyFromSignature,
+  computeStarknetPublicKey,
+  computeStarknetAddress,
   starknetKeccak,
   computePoseidonHashOnElements,
   reduceToField,

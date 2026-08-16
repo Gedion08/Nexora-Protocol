@@ -1,5 +1,30 @@
 {
-  "transactions": [],
+  "transactions": [
+    {
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "type": "shield",
+      "network": "mainnet",
+      "timestamp": "2026-08-15T00:00:00Z",
+      "status": "confirmed",
+      "description": "First shield transaction on mainnet"
+    },
+    {
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "type": "shield",
+      "network": "mainnet",
+      "timestamp": "2026-08-15T12:00:00Z",
+      "status": "confirmed",
+      "description": "Second shield transaction on mainnet (relayer deposit)"
+    },
+    {
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000003",
+      "type": "shield",
+      "network": "mainnet",
+      "timestamp": "2026-08-16T00:00:00Z",
+      "status": "confirmed",
+      "description": "Third shield transaction on mainnet (relayer deposit)"
+    }
+  ],
   "contracts": [
     {
       "name": "NexoraPrivacyHub",

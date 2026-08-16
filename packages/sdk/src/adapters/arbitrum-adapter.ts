@@ -101,7 +101,7 @@ export class ArbitrumAdapter {
     }
   }
 
-  async reserveBridge(sourceToken: string, destinationToken: string, amount: number, destinationAddress: string, sourceAddress?: string): Promise<BridgeReservation> {
+  async reserveBridge(sourceToken: string, destinationToken: string, amount: number, destinationAddress: string, sourceAddress?: string, refundAddress?: string, referenceId?: string): Promise<BridgeReservation> {
     if (amount <= 0) {
       throw new InvalidArgumentError('Amount must be greater than zero');
     }
@@ -116,7 +116,10 @@ export class ArbitrumAdapter {
         destinationToken,
         amount,
         destinationAddress,
-        sourceAddress
+        sourceAddress,
+        false,
+        refundAddress,
+        referenceId
       );
     } catch (error) {
       if (error instanceof LayerSwapApiError) {
