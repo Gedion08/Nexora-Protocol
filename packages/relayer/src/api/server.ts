@@ -241,12 +241,13 @@ export class RelayerApiServer {
   }
 
   private async handleCancelIntent(req: Request, res: Response): Promise<void> {
-    const { id } = req.params;
-    res.status(501).json({
-      error: 'not_implemented',
-      message: 'Intent cancellation is not yet supported',
-      intentId: id,
-    });
+    try {
+      const { id } = req.params;
+      const result = await this.deps.orchestrator.cancelIntent(id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: 'cancel_failed', message: error.message });
+    }
   }
 
   private async handleGetInventory(_req: Request, res: Response): Promise<void> {

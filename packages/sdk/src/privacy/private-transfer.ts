@@ -48,7 +48,7 @@ export class PrivateTransferBuilder {
       }
 
       const recipientStr = typeof recipient === 'bigint' ? '0x' + recipient.toString(16) : recipient;
-      const tx = await this.client.privateTransfer(account, recipientStr, token, amount);
+      const tx = await this.client.privateTransfer(account, recipientStr, token, amount, proof.proof ? [proof.proof] : []);
 
       const receipt = await tx.wait();
 

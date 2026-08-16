@@ -79,7 +79,7 @@ describe('UnshieldBuilder', () => {
       poolAddress,
       chainId,
     });
-    expect(mockClient.unshield).toHaveBeenCalledWith(account, token, 5_000_000n, recipient);
+    expect(mockClient.unshield).toHaveBeenCalledWith(account, token, 5_000_000n, recipient, ['0xproofdata']);
     expect(result.transactionHash).toBe('0xunshieldtx456');
     expect(result.nullifier).toBe('0xnullifier123');
     expect(result.amount).toBe(5_000_000n);

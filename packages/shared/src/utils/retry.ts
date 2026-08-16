@@ -20,8 +20,8 @@ export class RetryableError extends Error {
 export class OperationTimeoutError extends Error {
   readonly timeoutMs: number;
 
-  constructor(timeoutMs: number) {
-    super(`Operation timed out after ${timeoutMs}ms`);
+  constructor(timeoutMs: number, message?: string) {
+    super(message ?? `Operation timed out after ${timeoutMs}ms`);
     this.name = 'OperationTimeoutError';
     this.timeoutMs = timeoutMs;
   }
@@ -64,13 +64,13 @@ export async function withRetry<T>(
 export async function withTimeout<T>(
   operation: () => Promise<T>,
   timeoutMs: number,
-  _message?: string
+  message?: string
 ): Promise<T> {
   return Promise.race([
     operation(),
     new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new OperationTimeoutError(timeoutMs)),
+        () => reject(new OperationTimeoutError(timeoutMs, message)),
         timeoutMs
       )
     ).catch((err) => {

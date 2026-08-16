@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/ --ext .ts",
+    "lint": "eslint src/",
     "clean": "rm -rf dist",
     "db:migrate": "node dist/db/migrate.js",
     "db:reset": "node dist/db/migrate.js --reset"

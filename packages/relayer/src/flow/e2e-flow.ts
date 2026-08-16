@@ -291,6 +291,24 @@ export class E2EOrchestrator {
     };
   }
 
+  async cancelIntent(intentId: string): Promise<{ intentId: string; status: string }> {
+    const intent = await this.intentRepo.getById(intentId);
+    if (!intent) {
+      throw new Error('Intent not found');
+    }
+
+    const nonCancellable = new Set(['completed', 'failed', 'cancelled', 'refunded']);
+    if (nonCancellable.has(intent.status)) {
+      throw new Error(`Cannot cancel intent in status: ${intent.status}`);
+    }
+
+    await this.inventory.release('starknet', 'USDC', BigInt(intent.amount_in_base_units)).catch(() => {});
+
+    await this.intentRepo.updateStatus(intentId, 'cancelled');
+
+    return { intentId, status: 'cancelled' };
+  }
+
   async getIntentStatus(intentId: string): Promise<IntentStatusInfo | null> {
     const intent = await this.intentRepo.getById(intentId);
     if (!intent) return null;

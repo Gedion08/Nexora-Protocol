@@ -364,7 +364,7 @@ export class PrivacyHubClient {
     }, ErrorCode.SHIELD_FAILED);
   }
 
-  unshield(account: Account, token: string, amount: bigint | string, recipient: string): Promise<TransactionResult> {
+  unshield(account: Account, token: string, amount: bigint | string, recipient: string, proof: string[] = []): Promise<TransactionResult> {
     return this.withError(async () => {
       if (!token) throw new InvalidArgumentError('Token address is required');
       if (!recipient) throw new InvalidArgumentError('Recipient address is required');
@@ -375,24 +375,25 @@ export class PrivacyHubClient {
       const options: Record<string, unknown> = { from: account.address };
       if (this.paymaster) {
         try {
+          const calldata: string[] = [token, num.toHex(amountBig), recipient, ...proof];
           const sponsorship = await this.paymaster.sponsorTransaction(
             account,
             this.privacyHubAddress,
             'unshield',
-            [token, num.toHex(amountBig), recipient],
+            calldata,
           );
           options.paymasterData = sponsorship.paymasterData;
         } catch (error) {
           throw new PaymasterError('Failed to get paymaster sponsorship for unshield', ErrorCode.TRANSACTION_FAILED, error);
         }
       }
-      const response: ContractResponse = await contract.unshield(token, num.toHex(amountBig), recipient, options);
+      const response: ContractResponse = await contract.unshield(token, num.toHex(amountBig), recipient, proof, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.UNSHIELD_FAILED);
   }
 
-  privateTransfer(account: Account, to: string, token: string, amount: bigint | string): Promise<TransactionResult> {
+  privateTransfer(account: Account, to: string, token: string, amount: bigint | string, proof: string[] = []): Promise<TransactionResult> {
     return this.withError(async () => {
       if (!to) throw new InvalidArgumentError('Recipient address is required');
       if (!token) throw new InvalidArgumentError('Token address is required');
@@ -403,18 +404,19 @@ export class PrivacyHubClient {
       const options: Record<string, unknown> = { from: account.address };
       if (this.paymaster) {
         try {
+          const calldata: string[] = [to, token, num.toHex(amountBig), ...proof];
           const sponsorship = await this.paymaster.sponsorTransaction(
             account,
             this.privacyHubAddress,
             'private_transfer',
-            [to, token, num.toHex(amountBig)],
+            calldata,
           );
           options.paymasterData = sponsorship.paymasterData;
         } catch (error) {
           throw new PaymasterError('Failed to get paymaster sponsorship for private_transfer', ErrorCode.TRANSACTION_FAILED, error);
         }
       }
-      const response: ContractResponse = await contract.private_transfer(to, token, num.toHex(amountBig), options);
+      const response: ContractResponse = await contract.private_transfer(to, token, num.toHex(amountBig), proof, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.TRANSFER_FAILED);

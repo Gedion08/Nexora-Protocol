@@ -71,7 +71,7 @@ describe('PrivateTransferBuilder', () => {
       pool_address: poolAddress,
       chain_id: chainId,
     });
-    expect(mockClient.privateTransfer).toHaveBeenCalledWith(account, '0x123456789abcdef', token, 5_000_000n);
+    expect(mockClient.privateTransfer).toHaveBeenCalledWith(account, '0x123456789abcdef', token, 5_000_000n, ['0xproofdata']);
     expect(result.transactionHash).toBe('0xtransfertx789');
     expect(result.nullifier).toBe('0xnullifier123');
     expect(result.amount).toBe(5_000_000n);

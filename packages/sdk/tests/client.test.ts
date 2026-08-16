@@ -339,17 +339,17 @@ describe('PrivacyHubClient methods', () => {
   it('should call unshield on PrivacyHub', async () => {
     mockContractInstance.unshield = vi.fn().mockResolvedValue('0xunshieldtx');
     const account = { address: '0xuser' } as any;
-    const result = await client.unshield(account, '0xtoken', 1000n, '0xrecipient');
+    const result = await client.unshield(account, '0xtoken', 1000n, '0xrecipient', []);
     expect(result.transactionHash).toBe('0xunshieldtx');
-    expect(mockContractInstance.unshield).toHaveBeenCalledWith('0xtoken', '0x3e8', '0xrecipient', { from: '0xuser' });
+    expect(mockContractInstance.unshield).toHaveBeenCalledWith('0xtoken', '0x3e8', '0xrecipient', [], { from: '0xuser' });
   });
 
   it('should call private_transfer on PrivacyHub', async () => {
     mockContractInstance.private_transfer = vi.fn().mockResolvedValue('0xtransfertx');
     const account = { address: '0xuser' } as any;
-    const result = await client.privateTransfer(account, '0xto', '0xtoken', 500n);
+    const result = await client.privateTransfer(account, '0xto', '0xtoken', 500n, []);
     expect(result.transactionHash).toBe('0xtransfertx');
-    expect(mockContractInstance.private_transfer).toHaveBeenCalledWith('0xto', '0xtoken', '0x1f4', { from: '0xuser' });
+    expect(mockContractInstance.private_transfer).toHaveBeenCalledWith('0xto', '0xtoken', '0x1f4', [], { from: '0xuser' });
   });
 
   it('should call add_supported_token on PrivacyHub', async () => {

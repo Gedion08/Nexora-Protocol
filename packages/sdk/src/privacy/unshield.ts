@@ -46,7 +46,7 @@ export class UnshieldBuilder {
 
       this.validateProof(proof, note);
 
-      const tx = await this.client.unshield(account, token, amount, recipient);
+      const tx = await this.client.unshield(account, token, amount, recipient, proof.proof ? proof.proof.split(',') : []);
 
       const receipt = await tx.wait();
 
