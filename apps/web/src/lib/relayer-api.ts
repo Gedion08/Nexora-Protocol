@@ -136,6 +136,17 @@ export interface HealthStatus {
   };
 }
 
+export interface PoolMetrics {
+  totalDeposits: number;
+  totalVolume: string;
+  activeUsers: number;
+  avgDepositSize: string;
+  completedCount: number;
+  shieldedCount: number;
+  inventoryCount: number;
+  lastUpdated: number;
+}
+
 class RelayerApiClient {
   private baseUrl: string;
 
@@ -216,6 +227,10 @@ class RelayerApiClient {
     availableBalance: string;
   }> {
     return this.request(`/inventory/${encodeURIComponent(token)}`);
+  }
+
+  async getPoolMetrics(): Promise<PoolMetrics> {
+    return this.request<PoolMetrics>("/metrics/pool");
   }
 
   async submitIntent(payload: SubmitIntentPayload): Promise<IntentResult> {

@@ -54,11 +54,11 @@ The product is positioned as a **cross-chain privacy routing protocol**, not mer
 |-----------|--------|
 | Registration (strk20-hackathon) | Complete |
 | Architecture | Defined |
-| Contract design | Draft |
+| Contract design | Tested (5 unit tests, Cairo 2.20) |
 | Frontend | Complete |
-| SDK | Complete |
-| Relayer | Complete |
-| Mainnet transactions | 3 of 3 required |
+| SDK | Complete (334 tests) |
+| Relayer | Complete (96 tests) |
+| Mainnet transactions | 3 of 3 required (hashes pending) |
 | Demo video | Pending |
 | Demo URL | Live |
 
@@ -99,6 +99,9 @@ Set the following environment variables in Vercel:
 - `NEXT_PUBLIC_CHAIN_ID` — `SN_MAIN` or `SN_SEPOLIA`
 - `NEXT_PUBLIC_RPC_URL` — Starknet RPC endpoint
 - `NEXT_PUBLIC_POOL_ADDRESS` — STRK20 pool contract address
+- `NEXT_PUBLIC_PRIVACY_HUB_ADDRESS` — Nexora PrivacyHub contract address (for unshield calls)
+- `NEXT_PUBLIC_INDEXER_URL` — STRK20 indexer endpoint (enables live balances/withdrawals)
+- `NEXT_PUBLIC_PROVER_URL` — STRK20 prover endpoint (enables real proofs)
 
 ### Deploy Relayer to Render
 

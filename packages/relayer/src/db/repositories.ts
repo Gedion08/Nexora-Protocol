@@ -171,6 +171,35 @@ export class IntentRepository {
     }
     return counts;
   }
+
+  async getPoolMetrics(): Promise<{
+    totalDeposits: number;
+    totalVolume: string;
+    activeUsers: number;
+    avgDepositSize: string;
+    completedCount: number;
+    shieldedCount: number;
+  }> {
+    const result = await this.client.query(
+      `SELECT
+         COUNT(*)::int AS total_deposits,
+         COALESCE(SUM(CASE WHEN status IN ('completed', 'shielded') THEN amount::numeric ELSE 0 END), 0)::text AS total_volume,
+         COUNT(DISTINCT user_id)::int AS active_users,
+         COALESCE(AVG(CASE WHEN status IN ('completed', 'shielded') THEN amount::numeric ELSE NULL END), 0)::text AS avg_deposit_size,
+         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
+         COUNT(*) FILTER (WHERE status = 'shielded')::int AS shielded_count
+       FROM nexora.intents`
+    );
+    const row = result.rows[0] ?? {};
+    return {
+      totalDeposits: parseInt(row.total_deposits ?? '0', 10),
+      totalVolume: row.total_volume ?? '0',
+      activeUsers: parseInt(row.active_users ?? '0', 10),
+      avgDepositSize: row.avg_deposit_size ?? '0',
+      completedCount: parseInt(row.completed_count ?? '0', 10),
+      shieldedCount: parseInt(row.shielded_count ?? '0', 10),
+    };
+  }
 }
 
 export class SwapRepository {

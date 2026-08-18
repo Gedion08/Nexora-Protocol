@@ -8,6 +8,7 @@ import { TransactionHistory } from "@/components/transaction/TransactionHistory"
 import { PrivateBalance } from "@/components/balance/PrivateBalance";
 import { PrivacyHealthScore } from "@/components/balance/PrivacyHealthScore";
 import { PoolActivityMetrics } from "@/components/balance/PoolActivityMetrics";
+import { WithdrawForm } from "@/components/balance/WithdrawForm";
 import { ViewingKeyFlow } from "@/components/viewing-key/ViewingKeyFlow";
 import { SelectiveDisclosure } from "@/components/viewing-key/SelectiveDisclosure";
 import { useAppStore } from "@/store/useAppStore";
@@ -140,6 +141,9 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <PrivateBalance />
               <PrivacyHealthScore />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <WithdrawForm />
             </div>
           </Reveal>
         </div>

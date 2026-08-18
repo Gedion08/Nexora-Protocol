@@ -104,6 +104,33 @@ describe('ViewingKey getPublic/getPrivate', () => {
   });
 });
 
+describe('ViewingKey.fromPublicKey', () => {
+  const chainId = '0x534e5f4d41494e';
+  const poolAddress = '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a';
+
+  it('should construct a symmetric key from a public key', () => {
+    const vk = ViewingKey.fromPublicKey(123456789n, chainId, poolAddress);
+    expect(vk.publicKey).toBe(123456789n);
+    expect(vk.privateKey).toBe(123456789n);
+    expect(vk.chainId).toBe(chainId);
+    expect(vk.poolAddress).toBe(poolAddress);
+  });
+
+  it('should accept hex string public key', () => {
+    const vk = ViewingKey.fromPublicKey('0x75bcd15', chainId, poolAddress);
+    expect(vk.publicKey).toBe(123456789n);
+  });
+
+  it('should throw if public key is zero', () => {
+    expect(() => ViewingKey.fromPublicKey(0n, chainId, poolAddress)).toThrow();
+  });
+
+  it('should throw if chainId or poolAddress is missing', () => {
+    expect(() => ViewingKey.fromPublicKey(1n, '', poolAddress)).toThrow();
+    expect(() => ViewingKey.fromPublicKey(1n, chainId, '')).toThrow();
+  });
+});
+
 describe('ViewingKeyManager', () => {
   const mockClient = {
     poolAddress: '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a',

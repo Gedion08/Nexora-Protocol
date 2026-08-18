@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Shield, Eye, AlertCircle } from "lucide-react";
+import { KeyRound, Shield, Eye, AlertCircle, Wallet } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { useAccount } from "@starknet-react/core";
+import {
+  deriveViewingKeyFromWallet,
+  registerViewingKey,
+  isPoolConfigured,
+} from "@/lib/privacy-client";
 
 export function ViewingKeyFlow() {
   const { viewingKeys, addViewingKey, removeViewingKey } = useAppStore();
+  const { account, isConnected } = useAccount();
   const [isRegistering, setIsRegistering] = useState(false);
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
@@ -21,20 +28,57 @@ export function ViewingKeyFlow() {
     setIsRegistering(true);
     setError("");
 
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      let publicKey = "";
+      let viewingKey = "";
 
-    const newKey = {
-      id: crypto.randomUUID(),
-      label: label.trim(),
-      publicKey: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(""),
-      viewingKey: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(""),
-      createdAt: new Date(),
-      isActive: true,
-    };
+      if (isConnected && account) {
+        const derived = await deriveViewingKeyFromWallet(account as never);
+        if (derived) {
+          publicKey = derived.publicKey;
+          viewingKey = derived.viewingKey;
 
-    addViewingKey(newKey);
-    setLabel("");
-    setIsRegistering(false);
+          if (isPoolConfigured()) {
+            try {
+              await registerViewingKey(
+                account as never,
+                publicKey
+              );
+            } catch (e) {
+              setError(
+                e instanceof Error
+                  ? `Key derived but on-chain registration failed: ${e.message}`
+                  : "Key derived but on-chain registration failed"
+              );
+              return;
+            }
+          }
+        } else {
+          setError("Could not derive a viewing key from your wallet. Is the pool configured?");
+          return;
+        }
+      } else {
+        publicKey =
+          "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+        viewingKey = publicKey;
+      }
+
+      const newKey = {
+        id: crypto.randomUUID(),
+        label: label.trim(),
+        publicKey,
+        viewingKey,
+        createdAt: new Date(),
+        isActive: true,
+      };
+
+      addViewingKey(newKey);
+      setLabel("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to register viewing key");
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   const handleDeactivate = (id: string) => {
@@ -89,6 +133,18 @@ export function ViewingKeyFlow() {
               </p>
             </div>
           </div>
+
+          {isConnected && account ? (
+            <div className="flex items-center gap-2 p-3 bg-blue-500/5 border border-blue-500/20 rounded text-xs text-blue-400 mono">
+              <Wallet className="w-4 h-4 shrink-0" />
+              Key will be derived from your connected wallet signature
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded text-xs text-yellow-500 mono">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Connect a Starknet wallet to derive a real viewing key (demo key otherwise)
+            </div>
+          )}
 
           <div className="space-y-3">
             <label className="block text-sm text-zinc-300">Key Label</label>

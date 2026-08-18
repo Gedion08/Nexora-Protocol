@@ -20,6 +20,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@nexora-protocol/sdk':
+        specifier: workspace:^
+        version: link:../../packages/sdk
       '@starknet-io/get-starknet-core':
         specifier: ^4.0.8
         version: 4.0.8

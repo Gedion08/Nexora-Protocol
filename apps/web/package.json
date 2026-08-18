@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@nexora-protocol/sdk": "workspace:^",
     "@starknet-io/get-starknet-core": "^4.0.8",
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",

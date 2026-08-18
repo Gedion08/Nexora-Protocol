@@ -66,6 +66,24 @@ export class ViewingKey {
     }
   }
 
+  static fromPublicKey(
+    publicKey: bigint | string,
+    chainId: string,
+    poolAddress: string
+  ): ViewingKey {
+    if (!chainId) {
+      throw new InvalidArgumentError('chainId is required');
+    }
+    if (!poolAddress) {
+      throw new InvalidArgumentError('poolAddress is required');
+    }
+    const pk = typeof publicKey === 'bigint' ? publicKey : num.toBigInt(publicKey);
+    if (pk === 0n) {
+      throw new InvalidArgumentError('publicKey must be non-zero');
+    }
+    return new ViewingKey(pk, pk, chainId, poolAddress);
+  }
+
   static async deriveFromWallet(
     account: Account,
     chainId?: string,

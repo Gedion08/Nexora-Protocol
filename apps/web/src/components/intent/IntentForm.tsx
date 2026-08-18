@@ -29,19 +29,6 @@ const PRIVACY_LEVELS = [
   { id: "shielded", label: "Shielded", icon: Zap, description: "Full privacy pool" },
 ];
 
-function mapPrivacyLevel(level: string): "none" | "standard" | "maximum" {
-  switch (level) {
-    case "public":
-      return "none";
-    case "private":
-      return "standard";
-    case "shielded":
-      return "maximum";
-    default:
-      return "standard";
-  }
-}
-
 export function IntentForm() {
   const { intent, updateIntent, setRoutes, selectRoute } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);

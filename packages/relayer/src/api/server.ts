@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import type { RelayerConfig } from '@nexora-protocol/shared';
 import type { Database } from '../db/connection';
-import { SwapRepository } from '../db/repositories';
+import { SwapRepository, IntentRepository } from '../db/repositories';
 import type { E2EOrchestrator } from '../flow/e2e-flow';
 import type { DepositEventListener } from '../bridge/deposit-listener';
 import type { InventoryManager } from '../bridge/inventory';
@@ -60,6 +60,9 @@ export class RelayerApiServer {
 
     this.app.get('/inventory', this.handleGetInventory.bind(this));
     this.app.get('/inventory/:token', this.handleGetTokenInventory.bind(this));
+
+    this.app.get('/metrics', this.handleGetMetrics.bind(this));
+    this.app.get('/metrics/pool', this.handleGetMetrics.bind(this));
 
     this.app.post('/withdrawals', this.handleSubmitWithdrawal.bind(this));
     this.app.get('/withdrawals/:id', this.handleGetWithdrawal.bind(this));
@@ -283,6 +286,31 @@ export class RelayerApiServer {
         availableBalance: available.toString(),
       });
     } catch (error: any) {
+      res.status(500).json({ error: 'internal_error', message: error.message });
+    }
+  }
+
+  private async handleGetMetrics(_req: Request, res: Response): Promise<void> {
+    try {
+      const metrics = await this.deps.db.executeInTransaction(async (client) => {
+        const repo = new IntentRepository(client);
+        const poolStats = await repo.getPoolMetrics();
+        const inventory = await this.deps.inventory.getAllInventories();
+        return {
+          totalDeposits: poolStats.totalDeposits,
+          totalVolume: poolStats.totalVolume,
+          activeUsers: poolStats.activeUsers,
+          avgDepositSize: poolStats.avgDepositSize,
+          completedCount: poolStats.completedCount,
+          shieldedCount: poolStats.shieldedCount,
+          inventoryCount: inventory.length,
+          lastUpdated: Date.now(),
+        };
+      });
+
+      res.json(metrics);
+    } catch (error: any) {
+      console.error('Failed to get pool metrics:', error);
       res.status(500).json({ error: 'internal_error', message: error.message });
     }
   }

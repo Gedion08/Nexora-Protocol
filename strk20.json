@@ -28,7 +28,7 @@
   "contracts": [
     {
       "name": "NexoraPrivacyHub",
-      "class_hash": "0x0211e36eb1ec34b3cfb3587bb3c9bb2c722f1e73c384fa1ba01485d6164ffd1e",
+      "class_hash": "0x07bdccfb596c90671b233ae045135a1caee9312c76122f92d99f36d95e1aa393",
       "network": "mainnet",
       "status": "pending_deployment",
       "artifact_path": "packages/contracts/target/dev/nexora_contracts_nexora_privacy_hub.contract_class.json",
@@ -37,5 +37,5 @@
     }
   ],
   "demo_video": "REPLACE_WITH_YOUTUBE_URL",
-  "demo_url": "REPLACE_WITH_DEMO_URL"
+  "demo_url": "https://nexora-protocol.vercel.app"
 }

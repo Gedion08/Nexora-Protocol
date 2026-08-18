@@ -12,4 +12,4 @@ casm = true
 starknet = "2.20.0"
 
 [dev-dependencies]
-# snforge is temporarily disabled until its git source is confirmed for this toolchain
+cairo_test = "2.20.0"
