@@ -29,6 +29,7 @@ export interface ShieldParams {
   token: string;
   amount: bigint;
   viewingKey: ViewingKeyData;
+  proof?: string[];
   blockIdentifier?: BlockIdentifier;
 }
 

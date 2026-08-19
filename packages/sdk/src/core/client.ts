@@ -337,7 +337,7 @@ export class PrivacyHubClient {
     }, ErrorCode.VIEWING_KEY_NOT_REGISTERED);
   }
 
-  shield(account: Account, token: string, amount: bigint | string): Promise<TransactionResult> {
+  shield(account: Account, token: string, amount: bigint | string, proof: string[] = []): Promise<TransactionResult> {
     return this.withError(async () => {
       if (!token) throw new InvalidArgumentError('Token address is required');
       const amountBig = typeof amount === 'bigint' ? amount : num.toBigInt(amount);
@@ -347,18 +347,19 @@ export class PrivacyHubClient {
       const options: Record<string, unknown> = { from: account.address };
       if (this.paymaster) {
         try {
+          const calldata: string[] = [token, num.toHex(amountBig), ...proof];
           const sponsorship = await this.paymaster.sponsorTransaction(
             account,
             this.privacyHubAddress,
             'shield',
-            [token, num.toHex(amountBig)],
+            calldata,
           );
           options.paymasterData = sponsorship.paymasterData;
         } catch (error) {
           throw new PaymasterError('Failed to get paymaster sponsorship for shield', ErrorCode.TRANSACTION_FAILED, error);
         }
       }
-      const response: ContractResponse = await contract.shield(token, num.toHex(amountBig), options);
+      const response: ContractResponse = await contract.shield(token, num.toHex(amountBig), proof, options);
       const txHash = extractTxHash(response);
       return createTxResult(txHash, this.provider, this.timeoutMs);
     }, ErrorCode.SHIELD_FAILED);

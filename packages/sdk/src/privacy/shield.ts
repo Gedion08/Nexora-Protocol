@@ -8,7 +8,7 @@ export class ShieldBuilder {
   ) {}
 
   async shield(params: ShieldParams): Promise<ShieldResult> {
-    const { account, token, amount, viewingKey } = params;
+    const { account, token, amount, viewingKey, proof } = params;
 
     if (!account) {
       throw new InvalidArgumentError('account is required for shield operation');
@@ -27,7 +27,7 @@ export class ShieldBuilder {
     }
 
     try {
-      const tx = await this.client.shield(account, token, amount);
+      const tx = await this.client.shield(account, token, amount, proof ?? []);
 
       const receipt = await tx.wait();
 

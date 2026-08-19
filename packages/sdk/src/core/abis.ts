@@ -17,6 +17,7 @@ export const PRIVACY_HUB_ABI = [
     inputs: [
       { name: 'token', type: 'core::starknet::contract_address::ContractAddress' },
       { name: 'amount', type: 'core::integer::u256' },
+      { name: 'proof', type: 'core::array::ArrayCore<core::felt252>' },
     ],
     outputs: [],
   },

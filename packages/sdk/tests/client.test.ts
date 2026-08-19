@@ -333,7 +333,15 @@ describe('PrivacyHubClient methods', () => {
     const account = { address: '0xuser' } as any;
     const result = await client.shield(account, '0xtoken', 1000n);
     expect(result.transactionHash).toBe('0xshieldtx');
-    expect(mockContractInstance.shield).toHaveBeenCalledWith('0xtoken', '0x3e8', { from: '0xuser' });
+    expect(mockContractInstance.shield).toHaveBeenCalledWith('0xtoken', '0x3e8', [], { from: '0xuser' });
+  });
+
+  it('should forward proof to shield on PrivacyHub', async () => {
+    mockContractInstance.shield = vi.fn().mockResolvedValue('0xshieldtx');
+    const account = { address: '0xuser' } as any;
+    const result = await client.shield(account, '0xtoken', 1000n, ['0xaa', '0xbb']);
+    expect(result.transactionHash).toBe('0xshieldtx');
+    expect(mockContractInstance.shield).toHaveBeenCalledWith('0xtoken', '0x3e8', ['0xaa', '0xbb'], { from: '0xuser' });
   });
 
   it('should call unshield on PrivacyHub', async () => {

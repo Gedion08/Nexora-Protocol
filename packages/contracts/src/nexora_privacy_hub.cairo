@@ -9,14 +9,15 @@ pub mod nexora_privacy_hub {
     const ERR_TOKEN_NOT_SUPPORTED: felt252 = 'TOKEN_NOT_SUPPORTED';
     const ERR_ZERO_AMOUNT: felt252 = 'ZERO_AMOUNT';
     const ERR_ZERO_ADDRESS: felt252 = 'ZERO_ADDRESS';
+    const ERR_EMPTY_PROOF: felt252 = 'EMPTY_PROOF';
 
     #[starknet::interface]
-    trait IERC20<TContractState> {
+    pub trait IERC20<TContractState> {
         fn transfer_from(self: @TContractState, sender: ContractAddress, recipient: ContractAddress, amount: u256);
     }
 
     #[starknet::interface]
-    trait IStrt20Pool<TContractState> {
+    pub trait IStrt20Pool<TContractState> {
         fn register_viewing_key(self: @TContractState, public_key: felt252);
         fn shield(
             self: @TContractState,
@@ -37,7 +38,7 @@ pub mod nexora_privacy_hub {
     }
 
     #[starknet::interface]
-    trait INexoraPrivacyHub<TContractState> {
+    pub trait INexoraPrivacyHub<TContractState> {
         fn get_admin(self: @TContractState) -> ContractAddress;
         fn get_pool(self: @TContractState) -> ContractAddress;
         fn is_supported_token(self: @TContractState, token: ContractAddress) -> bool;
@@ -46,7 +47,7 @@ pub mod nexora_privacy_hub {
         fn set_admin(ref self: TContractState, new_admin: ContractAddress);
         fn set_pool(ref self: TContractState, pool: ContractAddress);
         fn register_viewing_key(ref self: TContractState, public_key: felt252);
-        fn shield(ref self: TContractState, token: ContractAddress, amount: u256);
+        fn shield(ref self: TContractState, token: ContractAddress, amount: u256, proof: Array<felt252>);
         fn unshield(
             ref self: TContractState,
             token: ContractAddress,
@@ -73,7 +74,7 @@ pub mod nexora_privacy_hub {
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
+    pub enum Event {
         Shielded: Shielded,
         Unshielded: Unshielded,
         PrivateTransferred: PrivateTransferred,
@@ -84,48 +85,48 @@ pub mod nexora_privacy_hub {
     }
 
     #[derive(Drop, starknet::Event)]
-    struct Shielded {
-        user: ContractAddress,
-        token: ContractAddress,
-        amount: u256,
-        note_hash: felt252,
+    pub struct Shielded {
+        pub user: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub note_hash: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct Unshielded {
-        user: ContractAddress,
-        token: ContractAddress,
-        amount: u256,
-        recipient: ContractAddress,
+    pub struct Unshielded {
+        pub user: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub recipient: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct PrivateTransferred {
-        from: ContractAddress,
-        to: ContractAddress,
-        token: ContractAddress,
-        amount: u256,
+    pub struct PrivateTransferred {
+        pub from: ContractAddress,
+        pub to: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct ViewingKeyRegistered {
-        user: ContractAddress,
-        public_key: felt252,
+    pub struct ViewingKeyRegistered {
+        pub user: ContractAddress,
+        pub public_key: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct SupportedTokenAdded {
-        token: ContractAddress,
+    pub struct SupportedTokenAdded {
+        pub token: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct PoolSet {
-        pool: ContractAddress,
+    pub struct PoolSet {
+        pub pool: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct AdminSet {
-        admin: ContractAddress,
+    pub struct AdminSet {
+        pub admin: ContractAddress,
     }
 
     #[constructor]
@@ -186,7 +187,7 @@ pub mod nexora_privacy_hub {
             self.emit(Event::ViewingKeyRegistered(ViewingKeyRegistered { user, public_key }));
         }
 
-        fn shield(ref self: ContractState, token: ContractAddress, amount: u256) {
+        fn shield(ref self: ContractState, token: ContractAddress, amount: u256, proof: Array<felt252>) {
             let user = get_caller_address();
             assert(amount > 0, ERR_ZERO_AMOUNT);
             assert(!token.is_zero(), ERR_ZERO_ADDRESS);
@@ -199,7 +200,7 @@ pub mod nexora_privacy_hub {
             let pool_address = self.pool_address.read();
             let viewing_key = self.user_viewing_keys.read(user);
             let pool = IStrt20PoolDispatcher { contract_address: pool_address };
-            let note_hash = pool.shield(token, amount, user, viewing_key, array![]);
+            let note_hash = pool.shield(token, amount, user, viewing_key, proof);
 
             self.emit(Event::Shielded(Shielded { user, token, amount, note_hash }));
         }
@@ -216,6 +217,7 @@ pub mod nexora_privacy_hub {
             assert(!recipient.is_zero(), ERR_ZERO_ADDRESS);
             assert(!token.is_zero(), ERR_ZERO_ADDRESS);
             assert(self.supported_tokens.read(token), ERR_TOKEN_NOT_SUPPORTED);
+            assert(!proof.is_empty(), ERR_EMPTY_PROOF);
 
             let pool_address = self.pool_address.read();
             let pool = IStrt20PoolDispatcher { contract_address: pool_address };
@@ -236,6 +238,7 @@ pub mod nexora_privacy_hub {
             assert(!to.is_zero(), ERR_ZERO_ADDRESS);
             assert(!token.is_zero(), ERR_ZERO_ADDRESS);
             assert(self.supported_tokens.read(token), ERR_TOKEN_NOT_SUPPORTED);
+            assert(!proof.is_empty(), ERR_EMPTY_PROOF);
 
             let pool_address = self.pool_address.read();
             let pool = IStrt20PoolDispatcher { contract_address: pool_address };
@@ -248,32 +251,36 @@ pub mod nexora_privacy_hub {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use starknet::{ContractAddress, contract_address_const};
-        use starknet::storage::{StoragePointerWriteAccess, StorageMapWriteAccess};
-        use starknet::testing;
+        use starknet::ContractAddress;
+        use starknet::storage::StoragePointerWriteAccess;
+        use snforge_std::{start_cheat_caller_address_global};
 
         const ADMIN: felt252 = 1;
         const POOL: felt252 = 2;
         const TOKEN: felt252 = 3;
         const PUBLIC_KEY: felt252 = 123456789;
 
+        fn felt_address(value: felt252) -> ContractAddress {
+            value.try_into().unwrap()
+        }
+
         fn admin() -> ContractAddress {
-            contract_address_const::<ADMIN>()
+            felt_address(ADMIN)
         }
 
         fn pool_addr() -> ContractAddress {
-            contract_address_const::<POOL>()
+            felt_address(POOL)
         }
 
         fn token() -> ContractAddress {
-            contract_address_const::<TOKEN>()
+            felt_address(TOKEN)
         }
 
         fn setup_with_admin() -> ContractState {
             let mut state = unsafe_new_contract_state();
             state.admin.write(admin());
             state.pool_address.write(pool_addr());
-            testing::set_caller_address(admin());
+            start_cheat_caller_address_global(admin());
             state
         }
 
@@ -296,7 +303,7 @@ pub mod nexora_privacy_hub {
         #[test]
         fn test_set_pool() {
             let mut state = setup_with_admin();
-            let new_pool = contract_address_const::<5>();
+            let new_pool = felt_address(5);
             HubImpl::set_pool(ref state, new_pool);
             assert(HubImpl::get_pool(@state) == new_pool, 'Pool not updated');
         }
@@ -304,7 +311,7 @@ pub mod nexora_privacy_hub {
         #[test]
         fn test_set_admin() {
             let mut state = setup_with_admin();
-            let new_admin = contract_address_const::<6>();
+            let new_admin = felt_address(6);
             HubImpl::set_admin(ref state, new_admin);
             assert(HubImpl::get_admin(@state) == new_admin, 'Admin not updated');
         }
@@ -312,12 +319,9 @@ pub mod nexora_privacy_hub {
         #[test]
         fn test_viewing_key_storage() {
             let mut state = setup_with_admin();
-            state.user_viewing_keys.write(contract_address_const::<0>(), PUBLIC_KEY);
-            assert(
-                HubImpl::get_user_viewing_key(@state, contract_address_const::<0>())
-                    == PUBLIC_KEY,
-                'Viewing key not stored',
-            );
+            let user = felt_address(0);
+            state.user_viewing_keys.write(user, PUBLIC_KEY);
+            assert(HubImpl::get_user_viewing_key(@state, user) == PUBLIC_KEY, 'Viewing key not stored');
         }
     }
 }

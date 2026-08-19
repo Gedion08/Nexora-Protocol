@@ -48,12 +48,26 @@ describe('ShieldBuilder', () => {
     const builder = new ShieldBuilder(mockClient as any);
     const result = await builder.shield(makeParams());
 
-    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n);
+    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, []);
     expect(result.transactionHash).toBe('0xshieldtx123');
     expect(result.amount).toBe(5_000_000n);
     expect(result.token).toBe(token);
     expect(result.noteHash).toBeDefined();
     expect(typeof result.noteHash).toBe('string');
+  });
+
+  it('should forward a provided proof to the hub', async () => {
+    const txResult = {
+      transactionHash: '0xshieldtxproof',
+      wait: vi.fn().mockResolvedValue({ status: 'ACCEPTED_ON_L2', timestamp: Date.now() }),
+    };
+    mockClient.shield.mockResolvedValue(txResult);
+
+    const builder = new ShieldBuilder(mockClient as any);
+    const result = await builder.shield(makeParams({ proof: ['0xaa', '0xbb'] }));
+
+    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, ['0xaa', '0xbb']);
+    expect(result.transactionHash).toBe('0xshieldtxproof');
   });
 
   it('should wait for transaction confirmation', async () => {
