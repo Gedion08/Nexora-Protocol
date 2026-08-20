@@ -25,17 +25,20 @@ export const DEFAULT_PROVER_TIMEOUT_MS = 120_000;
 export const DEFAULT_INDEXER_TIMEOUT_MS = 30_000;
 export const DEFAULT_TX_WAIT_TIMEOUT_MS = 120_000;
 
+const CHAIN_ID_VALUES = new Set(Object.values(CHAIN_IDS));
+
 export function isChainId(value: string): value is keyof typeof CHAIN_IDS {
-  return Object.values(CHAIN_IDS).includes(value as any);
+  return CHAIN_ID_VALUES.has(value as typeof CHAIN_IDS[keyof typeof CHAIN_IDS]);
 }
 
 export function getDefaultPoolAddress(chainId: string): string {
   if (chainId === CHAIN_IDS.MAINNET) return POOL_ADDRESSES.MAINNET;
   if (chainId === CHAIN_IDS.SEPOLIA) return POOL_ADDRESSES.SEPOLIA;
-  return POOL_ADDRESSES.MAINNET;
+  throw new Error(`Unsupported chain ID: ${chainId}`);
 }
 
 export function getDefaultRpcUrl(chainId: string): string {
   if (chainId === CHAIN_IDS.SEPOLIA) return DEFAULT_RPC_URLS.SEPOLIA;
-  return DEFAULT_RPC_URLS.MAINNET;
+  if (chainId === CHAIN_IDS.MAINNET) return DEFAULT_RPC_URLS.MAINNET;
+  throw new Error(`Unsupported chain ID: ${chainId}`);
 }

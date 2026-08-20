@@ -3,12 +3,12 @@ import type { RelayerConfig } from '@nexora-protocol/shared';
 import type { Database } from '../db/connection';
 import { ShieldTxRepository } from '../db/repositories';
 import { RpcProvider, Account, Contract, num } from 'starknet';
-import { PoolClient, PrivacyHubClient } from '@nexora-protocol/sdk';
+import { PoolClient, PrivacyHubClient, computeNoteHash } from '@nexora-protocol/sdk';
 import {
   MAX_RETRIES,
   RETRY_BACKOFF_MS,
 } from '@nexora-protocol/shared';
-import { withRetry, withTimeout, OperationTimeoutError } from '@nexora-protocol/shared';
+import { withRetry, withTimeout } from '@nexora-protocol/shared';
 
 export interface ShieldResult {
   transactionHash: string;
@@ -172,7 +172,7 @@ export class RelayerPrivacyHubClient {
       }
     }
 
-    const noteHash = this.deriveNoteHash(txHash!, account.address, token, amount);
+    const noteHash = computeNoteHash(txHash!, account.address, token, amount);
     const receipt = await this.waitForTransaction(txHash!);
 
     await this.db.executeInTransaction(async (client) => {
@@ -249,7 +249,7 @@ export class RelayerPrivacyHubClient {
       }
     }
 
-    const noteHash = this.deriveNoteHash(txHash!, account.address, token, amount);
+    const noteHash = computeNoteHash(txHash!, account.address, token, amount);
     const receipt = await this.waitForTransaction(txHash!);
 
     return {
@@ -318,19 +318,11 @@ export class RelayerPrivacyHubClient {
     txHash: string,
     timeoutMs: number = this.config.txWaitTimeoutMs
   ): Promise<any> {
-    const raceResult = (await Promise.race([
-      withTimeout(
-        () => this.provider.waitForTransaction(txHash, { retryInterval: 2000 }),
-        timeoutMs,
-        `Transaction ${txHash} timed out after ${timeoutMs}ms`
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new OperationTimeoutError(timeoutMs)),
-          timeoutMs
-        )
-      ),
-    ])) as any;
+    const raceResult = (await withTimeout(
+      () => this.provider.waitForTransaction(txHash, { retryInterval: 2000 }),
+      timeoutMs,
+      `Transaction ${txHash} timed out after ${timeoutMs}ms`
+    )) as any;
 
     return {
       transactionHash: txHash,
@@ -340,15 +332,6 @@ export class RelayerPrivacyHubClient {
       gasUsed: raceResult.actual_fee?.amount?.toString(),
       timestamp: raceResult.timestamp,
     };
-  }
-
-  deriveNoteHash(txHash: string, user: string, token: string, amount: bigint): string {
-    const combined = `${txHash}:${user}:${token}:${amount.toString()}`;
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      hash = (hash * 31 + combined.charCodeAt(i)) | 0;
-    }
-    return `0x${(hash >>> 0).toString(16).padStart(8, '0')}`;
   }
 
   private async recordShieldFailure(

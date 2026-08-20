@@ -65,9 +65,9 @@ export class E2EOrchestrator {
   private swapRepo: SwapRepository;
   private depositRepo: DepositRepository;
   private shieldRepo: ShieldTxRepository;
-  private bridge: LayerSwapRelayer;
-  private privacyHub: RelayerPrivacyHubClient;
-  private inventory: InventoryManager;
+  readonly bridge: LayerSwapRelayer;
+  readonly privacyHub: RelayerPrivacyHubClient;
+  readonly inventory: InventoryManager;
 
   constructor(
     config: RelayerConfig,
@@ -230,41 +230,49 @@ export class E2EOrchestrator {
   async processPendingDeposits(): Promise<void> {
     const pendingSwaps = await this.swapRepo.getPendingByDestinationAddress(this.config.relayerStarknetAddress);
 
-    console.log(`Found ${pendingSwaps.length} pending swaps with destination address ${this.config.relayerStarknetAddress}`);
+    if (pendingSwaps.length === 0) return;
 
-    for (const swap of pendingSwaps) {
-      try {
-        const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
-        if (bridgeStatus.status === 'completed') {
-          const deposit = await this.depositRepo.getByToAddress(this.config.relayerStarknetAddress);
-          if (deposit && !deposit.shield_tx_hash) {
-            await this.onDepositReceived({
-              id: deposit.id,
-              intentId: swap.intent_id,
-              swapId: swap.swap_id,
-              amount: BigInt(deposit.amount),
-            });
+    await Promise.allSettled(
+      pendingSwaps.map(async (swap) => {
+        try {
+          const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          if (bridgeStatus.status === 'completed') {
+            const deposits = await this.depositRepo.getByIntentId(swap.intent_id);
+            for (const deposit of deposits) {
+              if (!deposit.shield_tx_hash) {
+                await this.onDepositReceived({
+                  id: deposit.id,
+                  intentId: deposit.intent_id,
+                  swapId: deposit.swap_id,
+                  amount: BigInt(deposit.amount),
+                });
+              }
+            }
           }
+        } catch (error) {
+          console.error(`Error processing swap ${swap.swap_id}:`, error);
         }
-      } catch (error) {
-        console.error(`Error processing swap ${swap.swap_id}:`, error);
-      }
-    }
+      })
+    );
   }
 
   async processFailedSwaps(): Promise<void> {
     const pendingSwaps = await this.swapRepo.getPendingByDestinationAddress(this.config.relayerStarknetAddress);
 
-    for (const swap of pendingSwaps) {
-      try {
-        const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
-        if (bridgeStatus.status === 'failed' || bridgeStatus.status === 'expired' || bridgeStatus.status === 'cancelled') {
-          await this.refundIntent(swap.intent_id, swap.swap_id);
+    if (pendingSwaps.length === 0) return;
+
+    await Promise.allSettled(
+      pendingSwaps.map(async (swap) => {
+        try {
+          const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          if (bridgeStatus.status === 'failed' || bridgeStatus.status === 'expired' || bridgeStatus.status === 'cancelled') {
+            await this.refundIntent(swap.intent_id, swap.swap_id);
+          }
+        } catch (error) {
+          console.error(`Error checking swap ${swap.swap_id} for refund:`, error);
         }
-      } catch (error) {
-        console.error(`Error checking swap ${swap.swap_id} for refund:`, error);
-      }
-    }
+      })
+    );
   }
 
   async refundIntent(intentId: string, swapId: string): Promise<RefundInfo> {

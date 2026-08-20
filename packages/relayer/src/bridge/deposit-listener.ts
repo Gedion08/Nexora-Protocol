@@ -228,7 +228,7 @@ export class DepositEventListener {
       }
     }
 
-    return pendingSwaps[0] ?? null;
+    return null;
   }
 
   private extractAddress(value: any): string {

@@ -1,10 +1,11 @@
 import { ShieldParams, ShieldResult, ShieldEvent } from '../types';
-import { PrivacyHubClient } from '../core/client';
+import { PoolClient } from '../core/client';
 import { ViewingKeyError, ShieldError, InvalidArgumentError } from '../utils/errors';
+import { computeNoteHash } from '../utils/poseidon';
 
 export class ShieldBuilder {
   constructor(
-    private readonly client: PrivacyHubClient
+    private readonly client: PoolClient
   ) {}
 
   async shield(params: ShieldParams): Promise<ShieldResult> {
@@ -27,7 +28,10 @@ export class ShieldBuilder {
     }
 
     try {
-      const tx = await this.client.shield(account, token, amount, proof ?? []);
+      const vk = typeof viewingKey.publicKey === 'bigint'
+        ? viewingKey.publicKey
+        : BigInt(viewingKey.publicKey);
+      const tx = await this.client.shield(account, token, amount, vk, proof ?? []);
 
       const receipt = await tx.wait();
 
@@ -56,7 +60,7 @@ export class ShieldBuilder {
     token: string,
     amount: bigint
   ): ShieldEvent {
-    const noteHash = this.deriveNoteHash(txHash, user, token, amount);
+    const noteHash = computeNoteHash(txHash, user, token, amount);
     return {
       user,
       token,
@@ -64,14 +68,5 @@ export class ShieldBuilder {
       noteHash,
       timestamp: Date.now(),
     };
-  }
-
-  deriveNoteHash(txHash: string, user: string, token: string, amount: bigint): string {
-    const combined = `${txHash}:${user}:${token}:${amount.toString()}`;
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      hash = (hash * 31 + combined.charCodeAt(i)) | 0;
-    }
-    return `0x${(hash >>> 0).toString(16).padStart(8, '0')}`;
   }
 }

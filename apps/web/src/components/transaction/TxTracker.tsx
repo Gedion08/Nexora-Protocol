@@ -16,7 +16,6 @@ const STATUS_STEPS = [
 
 export function TxTracker() {
   const { intent, updateIntent } = useAppStore();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPolling, setIsPolling] = useState(false);
 
@@ -47,9 +46,6 @@ export function TxTracker() {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
-      }
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
       }
     };
   }, [intent?.status, intent?.txHash, updateIntent]);

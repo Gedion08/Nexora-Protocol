@@ -94,3 +94,8 @@ export function computeStarknetAddress(privateKeyHex: string): string {
   const address = ec.starkCurve.getStarkKey(privateKeyHex);
   return typeof address === 'string' ? address : num.toHex(address);
 }
+
+export function computeNoteHash(txHash: string, user: string, token: string, amount: bigint): string {
+  const message = `${txHash}:${user}:${token}:${amount.toString()}`;
+  return num.toHex(starknetKeccak(message));
+}

@@ -95,15 +95,9 @@ export class IndexerDiscoveryProvider {
 
       for (const note of decryptedNotes) {
         if (note.spent && !options.includeSpent) continue;
-        if (!note.spent && options.includeSpent === false) {
-          const existing = result.get(note.token) ?? [];
-          existing.push(note);
-          result.set(note.token, existing);
-        } else {
-          const existing = result.get(note.token) ?? [];
-          existing.push(note);
-          result.set(note.token, existing);
-        }
+        const existing = result.get(note.token) ?? [];
+        existing.push(note);
+        result.set(note.token, existing);
       }
 
       return result;
@@ -114,17 +108,15 @@ export class IndexerDiscoveryProvider {
   }
 
   private async decryptNotes(notes: IndexerNote[], privateKey: string): Promise<ShieldedNote[]> {
-    const decrypted: ShieldedNote[] = [];
     const privKey = BigInt(privateKey);
+    const results = await Promise.allSettled(
+      notes.map((note) => Promise.resolve(this.decryptNote(note, privKey)))
+    );
 
-    for (const note of notes) {
-      const shieldedNote = this.decryptNote(note, privKey);
-      if (shieldedNote) {
-        decrypted.push(shieldedNote);
-      }
-    }
-
-    return decrypted;
+    return results
+      .filter((r): r is PromiseFulfilledResult<ShieldedNote | null> => r.status === 'fulfilled')
+      .map((r) => r.value)
+      .filter((note): note is ShieldedNote => note !== null);
   }
 
   private decryptNote(note: IndexerNote, privateKey: bigint): ShieldedNote | null {
@@ -146,6 +138,7 @@ export class IndexerDiscoveryProvider {
         metadata: note.metadata,
       };
     } catch {
+      console.debug('Failed to decrypt note', note.noteHash);
       return null;
     }
   }
@@ -163,6 +156,7 @@ export class IndexerDiscoveryProvider {
       }
     } catch {
       // Not JSON-encoded, try other methods
+      console.debug('Note value is not JSON-encoded, attempting fallback');
     }
 
     try {

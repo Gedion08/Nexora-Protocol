@@ -182,15 +182,14 @@ describe('DepositEventListener', () => {
       expect(result.swap_id).toBe('swap-1');
     });
 
-    it('should return first swap when no amount match', async () => {
+    it('should return null when no amount match', async () => {
       mockSwapRepo.getPendingByDestinationAddress = vi.fn().mockResolvedValue([
         { swap_id: 'swap-1', intent_id: 'intent-1', amount: '999', status: 'awaiting_deposit' },
         { swap_id: 'swap-2', intent_id: 'intent-2', amount: '888', status: 'awaiting_deposit' },
       ]);
 
       const result = await (listener as any).matchDepositToSwap(1000000n);
-      expect(result).not.toBeNull();
-      expect(result.swap_id).toBe('swap-1');
+      expect(result).toBeNull();
     });
   });
 

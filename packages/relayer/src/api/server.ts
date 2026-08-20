@@ -38,9 +38,13 @@ export class RelayerApiServer {
   }
 
   private setupMiddleware(): void {
+    const corsOrigin = process.env.CORS_ORIGIN;
+    if (!corsOrigin) {
+      console.warn('CORS_ORIGIN is not set. CORS will be disabled.');
+    }
     this.app.use(cors({
-      origin: process.env.CORS_ORIGIN ?? '*',
-      credentials: true,
+      origin: corsOrigin ?? false,
+      credentials: Boolean(corsOrigin),
     }));
     this.app.use(helmet());
     this.app.use(express.json({ limit: '10mb' }));
@@ -360,13 +364,13 @@ export class RelayerApiServer {
       }
 
       const numAmount = Number(amount);
-      const quote = await this.deps.orchestrator['bridge'].estimateFee(
+      const quote = await this.deps.orchestrator.bridge.estimateFee(
         String(sourceToken),
         String(destinationToken),
         numAmount
       );
 
-      const limits = await this.deps.orchestrator['bridge'].getLimits(
+      const limits = await this.deps.orchestrator.bridge.getLimits(
         String(sourceToken),
         String(destinationToken),
         numAmount
@@ -506,7 +510,9 @@ export class RelayerApiServer {
   private toBaseUnits(amount: string | number, token: string): string {
     const numAmount = Number(amount);
     const decimals = token.toUpperCase() === 'USDC' || token.toUpperCase() === 'USDT' ? 6 : 18;
-    return (numAmount * Math.pow(10, decimals)).toString();
+    const factor = BigInt(10) ** BigInt(decimals);
+    const bigAmount = BigInt(Math.round(numAmount * Number(factor)));
+    return bigAmount.toString();
   }
 
   listen(): void {

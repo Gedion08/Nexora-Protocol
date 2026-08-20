@@ -103,9 +103,8 @@ describe('getDefaultPoolAddress', () => {
     expect(result).toBe(POOL_ADDRESSES.SEPOLIA);
   });
 
-  it('should return mainnet pool address for unknown chain', () => {
-    const result = getDefaultPoolAddress('0xunknown');
-    expect(result).toBe(POOL_ADDRESSES.MAINNET);
+  it('should throw for unknown chain', () => {
+    expect(() => getDefaultPoolAddress('0xunknown')).toThrow('Unsupported chain ID: 0xunknown');
   });
 });
 
@@ -120,8 +119,7 @@ describe('getDefaultRpcUrl', () => {
     expect(result).toBe(DEFAULT_RPC_URLS.SEPOLIA);
   });
 
-  it('should return mainnet RPC for unknown chain', () => {
-    const result = getDefaultRpcUrl('0xunknown');
-    expect(result).toBe(DEFAULT_RPC_URLS.MAINNET);
+  it('should throw for unknown chain', () => {
+    expect(() => getDefaultRpcUrl('0xunknown')).toThrow('Unsupported chain ID: 0xunknown');
   });
 });

@@ -3,6 +3,7 @@ import { ShieldBuilder } from '../src/privacy/shield';
 import { ViewingKey } from '../src/privacy/viewing-key';
 import { ShieldError, ViewingKeyError, InvalidArgumentError } from '../src/utils/errors';
 import { ShieldParams, ShieldResult } from '../src/types';
+import { computeNoteHash } from '../src/utils/poseidon';
 
 describe('ShieldBuilder', () => {
   const mockClient = {
@@ -48,7 +49,7 @@ describe('ShieldBuilder', () => {
     const builder = new ShieldBuilder(mockClient as any);
     const result = await builder.shield(makeParams());
 
-    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, []);
+    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, viewingKey.publicKey, []);
     expect(result.transactionHash).toBe('0xshieldtx123');
     expect(result.amount).toBe(5_000_000n);
     expect(result.token).toBe(token);
@@ -66,7 +67,7 @@ describe('ShieldBuilder', () => {
     const builder = new ShieldBuilder(mockClient as any);
     const result = await builder.shield(makeParams({ proof: ['0xaa', '0xbb'] }));
 
-    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, ['0xaa', '0xbb']);
+    expect(mockClient.shield).toHaveBeenCalledWith(account, token, 5_000_000n, viewingKey.publicKey, ['0xaa', '0xbb']);
     expect(result.transactionHash).toBe('0xshieldtxproof');
   });
 
@@ -86,28 +87,16 @@ describe('ShieldBuilder', () => {
   });
 
   it('should derive a deterministic note hash', () => {
-    const builder = new ShieldBuilder(mockClient as any);
-    const noteHash1 = builder.deriveNoteHash(
-      '0xtxhash',
-      '0xuser',
-      '0xtoken',
-      1000000n
-    );
-    const noteHash2 = builder.deriveNoteHash(
-      '0xtxhash',
-      '0xuser',
-      '0xtoken',
-      1000000n
-    );
+    const noteHash1 = computeNoteHash('0xtxhash', '0xuser', '0xtoken', 1000000n);
+    const noteHash2 = computeNoteHash('0xtxhash', '0xuser', '0xtoken', 1000000n);
     expect(noteHash1).toBe(noteHash2);
-    expect(noteHash1).toMatch(/^0x[0-9a-f]{8}$/);
+    expect(noteHash1).toMatch(/^0x[0-9a-f]+$/);
   });
 
   it('should produce different note hashes for different inputs', () => {
-    const builder = new ShieldBuilder(mockClient as any);
-    const hash1 = builder.deriveNoteHash('0xabc', '0xuser1', '0xtoken', 1000n);
-    const hash2 = builder.deriveNoteHash('0xabc', '0xuser1', '0xtoken', 2000n);
-    const hash3 = builder.deriveNoteHash('0xdef', '0xuser1', '0xtoken', 1000n);
+    const hash1 = computeNoteHash('0xabc', '0xuser1', '0xtoken', 1000n);
+    const hash2 = computeNoteHash('0xabc', '0xuser1', '0xtoken', 2000n);
+    const hash3 = computeNoteHash('0xdef', '0xuser1', '0xtoken', 1000n);
     expect(hash1).not.toBe(hash2);
     expect(hash1).not.toBe(hash3);
     expect(hash2).not.toBe(hash3);

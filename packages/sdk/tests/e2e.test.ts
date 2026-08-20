@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PrivacyHubClient } from '../src/core/client';
+import { PrivacyHubClient, PoolClient } from '../src/core/client';
 import { ShieldBuilder } from '../src/privacy/shield';
 import { PrivateTransferBuilder } from '../src/privacy/private-transfer';
 import { UnshieldBuilder } from '../src/privacy/unshield';
@@ -58,9 +58,8 @@ describe('E2E: Shield → Private Transfer → Unshield', () => {
     mockContractInstance.shield = vi.fn().mockResolvedValue('0xshieldtx');
     mockContractInstance.register_viewing_key = vi.fn().mockResolvedValue('0xregtx');
 
-    const client = new PrivacyHubClient({
+    const client = new PoolClient({
       rpcUrl: RPC_URL,
-      privacyHubAddress: PRIVACY_HUB_ADDRESS,
       poolAddress: POOL_ADDRESS,
       chainId: CHAIN_ID,
     });

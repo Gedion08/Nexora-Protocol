@@ -102,6 +102,7 @@ export {
   hexToBigInt,
   bigIntToHex,
   feltToString,
+  computeNoteHash,
   STARK_CURVE_ORDER,
 } from './utils/poseidon';
 export type { SignatureComponents, ViewingKeyComponents } from './utils/poseidon';

@@ -153,7 +153,8 @@ export class ProvingService {
       }) as { valid: boolean };
 
       return Boolean(response?.valid);
-    } catch {
+    } catch (error) {
+      console.debug('Disclosure proof verification failed:', error);
       return false;
     }
   }
@@ -162,7 +163,8 @@ export class ProvingService {
     try {
       const response = await this.request('/health', 'GET') as { status?: string; healthy?: boolean };
       return Boolean(response?.status === 'ok' || response?.healthy);
-    } catch {
+    } catch (error) {
+      console.debug('Prover health check failed:', error);
       return false;
     }
   }

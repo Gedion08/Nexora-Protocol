@@ -45,10 +45,18 @@ function createTxResult(
     transactionHash: txHash,
     wait: async (waitTimeoutMs?: number): Promise<TransactionReceipt> => {
       const timeout = waitTimeoutMs ?? timeoutMs;
+      let resolved = false;
       const raceResult = (await Promise.race([
-        provider.waitForTransaction(txHash, { retryInterval: 2000 }),
+        provider.waitForTransaction(txHash, { retryInterval: 2000 }).then((receipt: any) => {
+          resolved = true;
+          return receipt;
+        }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new ShieldError('Transaction ' + txHash + ' timed out after ' + timeout + 'ms')), timeout)
+          setTimeout(() => {
+            if (!resolved) {
+              reject(new ShieldError('Transaction ' + txHash + ' timed out after ' + timeout + 'ms'));
+            }
+          }, timeout)
         ),
       ])) as any;
       return normalizeReceipt(txHash, raceResult);

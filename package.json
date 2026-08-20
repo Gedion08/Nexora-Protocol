@@ -9,6 +9,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{json,md,cairo,ts,tsx,js,jsx}\"",
     "clean": "turbo run clean && rm -rf node_modules",
