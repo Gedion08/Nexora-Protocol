@@ -9,6 +9,7 @@ import {
   RETRY_BACKOFF_MS,
 } from '@nexora-protocol/shared';
 import { withRetry, withTimeout } from '@nexora-protocol/shared';
+import { RelayerProverService } from '../proof/prover-service';
 
 export interface ShieldResult {
   transactionHash: string;
@@ -27,6 +28,15 @@ export interface UnshieldResult {
   status: string;
 }
 
+export interface PrivateTransferResult {
+  transactionHash: string;
+  nullifier: string;
+  amount: bigint;
+  token: string;
+  recipient: string;
+  status: string;
+}
+
 export class RelayerPrivacyHubClient {
   private config: RelayerConfig;
   private db: Database;
@@ -34,6 +44,7 @@ export class RelayerPrivacyHubClient {
   private poolClient: PoolClient;
   private privacyHubClient: PrivacyHubClient;
   private relayerAccount: Account | null = null;
+  private prover: RelayerProverService;
 
   constructor(config: RelayerConfig, db: Database) {
     this.config = config;
@@ -58,6 +69,8 @@ export class RelayerPrivacyHubClient {
         : '0x534e5f4d41494e',
       timeoutMs: config.txWaitTimeoutMs,
     });
+
+    this.prover = new RelayerProverService(config);
   }
 
   async initialize(): Promise<void> {
@@ -78,6 +91,13 @@ export class RelayerPrivacyHubClient {
     }
 
     console.log(`Relayer account initialized: ${this.config.relayerStarknetAddress}`);
+
+    await this.prover.initialize();
+    if (this.prover.isAvailable()) {
+      console.log('Prover service available for unshield and private transfers');
+    } else {
+      console.warn('Prover service unavailable; unshield and private transfers will fail');
+    }
   }
 
   async getAccount(): Promise<Account> {
@@ -209,6 +229,26 @@ export class RelayerPrivacyHubClient {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
+        let proof: string[] = [];
+
+        if (this.prover.isAvailable()) {
+          const proofResult = await withRetry(
+            () => this.prover.generateUnshieldProof({
+              noteHash: '',
+              token,
+              amount: amount.toString(),
+              nullifier: '',
+              viewingKey: { publicKey: '0', privateKey: '0' },
+            }),
+            {
+              maxRetries: 2,
+              baseDelayMs: RETRY_BACKOFF_MS,
+              timeoutMs: this.config.txWaitTimeoutMs,
+            }
+          );
+          proof = [proofResult.proof];
+        }
+
         const poolContract = new Contract(
           [
             {
@@ -228,7 +268,7 @@ export class RelayerPrivacyHubClient {
         );
 
         const response = await withRetry(
-          () => poolContract.unshield(token, amountHex, recipient, [], {
+          () => poolContract.unshield(token, amountHex, recipient, proof, {
             from: account.address,
           }),
           {
@@ -255,6 +295,91 @@ export class RelayerPrivacyHubClient {
     return {
       transactionHash: txHash!,
       noteHash,
+      amount,
+      token,
+      recipient,
+      status: receipt.status,
+    };
+  }
+
+  async privateTransfer(
+    token: string,
+    amount: bigint,
+    recipient: string,
+    viewingKey: { publicKey: string; privateKey: string }
+  ): Promise<PrivateTransferResult> {
+    const account = await this.getAccount();
+    const amountHex = num.toHex(amount);
+
+    let txHash = '';
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        let proof: string[] = [];
+
+        if (this.prover.isAvailable()) {
+          const proofResult = await withRetry(
+            () => this.prover.generateTransferProof({
+              token,
+              amount: amount.toString(),
+              recipient,
+              viewingKey,
+            }),
+            {
+              maxRetries: 2,
+              baseDelayMs: RETRY_BACKOFF_MS,
+              timeoutMs: this.config.txWaitTimeoutMs,
+            }
+          );
+          proof = [proofResult.proof];
+        }
+
+        const poolContract = new Contract(
+          [
+            {
+              type: 'function',
+              name: 'transfer',
+              inputs: [
+                { name: 'to', type: 'core::starknet::contract_address::ContractAddress' },
+                { name: 'token', type: 'core::starknet::contract_address::ContractAddress' },
+                { name: 'amount', type: 'core::integer::u256' },
+                { name: 'proof', type: 'core::array::ArrayCore<core::felt252>' },
+              ],
+              outputs: [{ name: 'note_hash', type: 'core::felt252' }],
+            },
+          ],
+          this.config.poolAddress,
+          account
+        );
+
+        const response = await withRetry(
+          () => poolContract.transfer(recipient, token, amountHex, proof, {
+            from: account.address,
+          }),
+          {
+            maxRetries: 2,
+            baseDelayMs: RETRY_BACKOFF_MS,
+            timeoutMs: this.config.txWaitTimeoutMs,
+          }
+        ) as any;
+        txHash = response.transaction_hash ?? response;
+        await this.waitForTransaction(txHash);
+        break;
+      } catch (error: any) {
+        if (attempt === MAX_RETRIES) {
+          throw error;
+        }
+        console.warn(`Private transfer attempt ${attempt + 1} failed, retrying:`, error.message);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS * Math.pow(2, attempt)));
+      }
+    }
+
+    const noteHash = computeNoteHash(txHash!, account.address, token, amount);
+    const receipt = await this.waitForTransaction(txHash!);
+
+    return {
+      transactionHash: txHash!,
+      nullifier: noteHash,
       amount,
       token,
       recipient,
@@ -362,6 +487,14 @@ export class RelayerPrivacyHubClient {
 
   isInitialized(): boolean {
     return this.relayerAccount !== null;
+  }
+
+  isProverAvailable(): boolean {
+    return this.prover.isAvailable();
+  }
+
+  getProver(): RelayerProverService {
+    return this.prover;
   }
 
   getPoolClient(): PoolClient {

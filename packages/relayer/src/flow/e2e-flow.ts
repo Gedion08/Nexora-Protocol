@@ -2,8 +2,10 @@ import type { RelayerConfig, IntentStatus, DepositAction, ChainId } from '@nexor
 import type { Database } from '../db/connection';
 import { IntentRepository, SwapRepository, DepositRepository, ShieldTxRepository } from '../db/repositories';
 import type { LayerSwapRelayer } from '../bridge/layerswap-relayer';
+import type { StarkGateRelayer } from '../bridge/starkgate-relayer';
 import type { RelayerPrivacyHubClient } from '../privacy/privacy-hub-client';
 import type { InventoryManager } from '../bridge/inventory';
+import type { DepositStatusResult } from '@nexora-protocol/sdk';
 
 export interface IntentSubmission {
   userId: string;
@@ -66,6 +68,7 @@ export class E2EOrchestrator {
   private depositRepo: DepositRepository;
   private shieldRepo: ShieldTxRepository;
   readonly bridge: LayerSwapRelayer;
+  readonly fallbackBridge: StarkGateRelayer;
   readonly privacyHub: RelayerPrivacyHubClient;
   readonly inventory: InventoryManager;
 
@@ -78,7 +81,8 @@ export class E2EOrchestrator {
     shieldRepo: ShieldTxRepository,
     bridge: LayerSwapRelayer,
     privacyHub: RelayerPrivacyHubClient,
-    inventory: InventoryManager
+    inventory: InventoryManager,
+    fallbackBridge: StarkGateRelayer
   ) {
     this.config = config;
     this.db = db;
@@ -87,6 +91,7 @@ export class E2EOrchestrator {
     this.depositRepo = depositRepo;
     this.shieldRepo = shieldRepo;
     this.bridge = bridge;
+    this.fallbackBridge = fallbackBridge;
     this.privacyHub = privacyHub;
     this.inventory = inventory;
   }
@@ -127,41 +132,95 @@ export class E2EOrchestrator {
 
       await this.intentRepo.updateStatus(intentId, 'inventory_reserved');
 
-      const limits = await this.bridge.getLimits(
-        submission.sourceToken,
-        submission.destinationToken,
-        Number(submission.amount)
-      );
+      let reservation: IntentResult | null = null;
+      let lastError: Error | null = null;
 
-      if (Number(submission.amount) < limits.min || (limits.max > 0 && Number(submission.amount) > limits.max)) {
-        throw new Error(
-          `Amount ${submission.amount} outside bridge limits [${limits.min}, ${limits.max}]`
+      try {
+        const limits = await this.bridge.getLimits(
+          submission.sourceToken,
+          submission.destinationToken,
+          Number(submission.amount)
         );
+
+        if (Number(submission.amount) < limits.min || (limits.max > 0 && Number(submission.amount) > limits.max)) {
+          throw new Error(
+            `Amount ${submission.amount} outside bridge limits [${limits.min}, ${limits.max}]`
+          );
+        }
+
+        await this.intentRepo.updateStatus(intentId, 'bridge_reserved');
+
+        const bridgeResult = await this.bridge.reserveBridge(
+          intentId,
+          submission.sourceToken,
+          submission.destinationToken,
+          Number(submission.amount),
+          submission.sourceAddress,
+          submission.refundAddress,
+          intentId
+        );
+
+        console.log(`LayerSwap bridge reserved for intent ${intentId}: swap ${bridgeResult.swapId}`);
+
+        reservation = {
+          intentId,
+          status: 'awaiting_deposit',
+          depositAddress: bridgeResult.depositAddress,
+          depositActions: bridgeResult.depositActions,
+          fee: bridgeResult.fee,
+          estimatedArrival: this.estimateArrival(),
+          referenceId: intentId,
+        };
+      } catch (primaryError) {
+        console.warn(`LayerSwap reservation failed for intent ${intentId}, trying StarkGate fallback:`, primaryError);
+        lastError = primaryError as Error;
+
+        try {
+          const fallbackResult = await this.fallbackBridge.reserveBridge(
+            intentId,
+            submission.sourceToken,
+            submission.destinationToken,
+            Number(submission.amount),
+            submission.sourceAddress,
+            submission.refundAddress,
+            intentId
+          );
+
+          await this.db.executeInTransaction(async (client) => {
+            const repo = new SwapRepository(client);
+            await repo.create({
+              swap_id: fallbackResult.swapId,
+              intent_id: intentId,
+              source_network: 'ARBITRUM',
+              source_token: fallbackResult.sourceToken,
+              destination_network: 'STARKNET',
+              destination_token: fallbackResult.destinationToken,
+              amount: String(fallbackResult.amount),
+              destination_address: this.config.relayerStarknetAddress,
+              deposit_address: fallbackResult.depositAddress,
+              status: 'awaiting_deposit',
+              fee: String(fallbackResult.fee),
+            });
+          });
+
+          console.log(`StarkGate fallback reserved for intent ${intentId}: swap ${fallbackResult.swapId}`);
+
+          reservation = {
+            intentId,
+            status: 'awaiting_deposit',
+            depositAddress: fallbackResult.depositAddress,
+            depositActions: fallbackResult.depositActions,
+            fee: fallbackResult.fee,
+            estimatedArrival: fallbackResult.estimatedArrival ?? this.estimateArrival(),
+            referenceId: intentId,
+          };
+        } catch (fallbackError) {
+          console.error(`Both LayerSwap and StarkGate failed for intent ${intentId}:`, fallbackError);
+          throw new Error(`Primary bridge failed: ${(lastError as Error).message}. Fallback bridge failed: ${(fallbackError as Error).message}`);
+        }
       }
 
-      await this.intentRepo.updateStatus(intentId, 'bridge_reserved');
-
-      const reservation = await this.bridge.reserveBridge(
-        intentId,
-        submission.sourceToken,
-        submission.destinationToken,
-        Number(submission.amount),
-        submission.sourceAddress,
-        submission.refundAddress,
-        intentId
-      );
-
-      console.log(`Bridge reserved for intent ${intentId}: swap ${reservation.swapId}`);
-
-      return {
-        intentId,
-        status: 'awaiting_deposit',
-        depositAddress: reservation.depositAddress,
-        depositActions: reservation.depositActions,
-        fee: reservation.fee,
-        estimatedArrival: this.estimateArrival(),
-        referenceId: intentId,
-      };
+      return reservation!;
     } catch (error) {
       console.error(`Failed to process intent ${intentId}:`, error);
       await this.intentRepo.updateStatus(
@@ -185,7 +244,13 @@ export class E2EOrchestrator {
 
     await this.intentRepo.updateStatus(deposit.intentId, 'detected');
 
-    const bridgeStatus = await this.bridge.getBridgeStatus(deposit.swapId);
+    let bridgeStatus: DepositStatusResult;
+    try {
+      bridgeStatus = await this.bridge.getBridgeStatus(deposit.swapId);
+    } catch {
+      bridgeStatus = await this.fallbackBridge.getBridgeStatus(deposit.swapId);
+    }
+
     if (bridgeStatus.status !== 'completed' && bridgeStatus.status !== 'processing') {
       console.warn(`Bridge not completed yet for swap ${deposit.swapId}, status: ${bridgeStatus.status}`);
       return;
@@ -227,6 +292,47 @@ export class E2EOrchestrator {
     }
   }
 
+  async handleExternalDeposit(swapId: string, txHash: string, amount: bigint): Promise<void> {
+    const swap = await this.swapRepo.getBySwapId(swapId);
+    if (!swap) {
+      console.warn(`External deposit for unknown swap: ${swapId}`);
+      return;
+    }
+
+    const existingDeposits = await this.depositRepo.getByIntentId(swap.intent_id);
+    const alreadyProcessed = existingDeposits.some(
+      (d) => d.source_tx_hash === txHash
+    );
+    if (alreadyProcessed) {
+      return;
+    }
+
+    const depositId = `ext_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
+    await this.db.executeInTransaction(async (client) => {
+      const repo = new DepositRepository(client);
+      await repo.create({
+        id: depositId,
+        intent_id: swap.intent_id,
+        swap_id: swapId,
+        source_tx_hash: txHash,
+        from_address: 'starkgate',
+        to_address: this.config.relayerStarknetAddress,
+        amount: amount.toString(),
+        token: 'USDC',
+        block_number: 0,
+        block_hash: '',
+        status: 'detected',
+      });
+    });
+
+    await this.onDepositReceived({
+      id: depositId,
+      intentId: swap.intent_id,
+      swapId: swapId,
+      amount,
+    });
+  }
+
   async processPendingDeposits(): Promise<void> {
     const pendingSwaps = await this.swapRepo.getPendingByDestinationAddress(this.config.relayerStarknetAddress);
 
@@ -235,7 +341,13 @@ export class E2EOrchestrator {
     await Promise.allSettled(
       pendingSwaps.map(async (swap) => {
         try {
-          const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          let bridgeStatus: DepositStatusResult;
+          try {
+            bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          } catch {
+            bridgeStatus = await this.fallbackBridge.getBridgeStatus(swap.swap_id);
+          }
+
           if (bridgeStatus.status === 'completed') {
             const deposits = await this.depositRepo.getByIntentId(swap.intent_id);
             for (const deposit of deposits) {
@@ -264,7 +376,13 @@ export class E2EOrchestrator {
     await Promise.allSettled(
       pendingSwaps.map(async (swap) => {
         try {
-          const bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          let bridgeStatus: DepositStatusResult;
+          try {
+            bridgeStatus = await this.bridge.getBridgeStatus(swap.swap_id);
+          } catch {
+            bridgeStatus = await this.fallbackBridge.getBridgeStatus(swap.swap_id);
+          }
+
           if (bridgeStatus.status === 'failed' || bridgeStatus.status === 'expired' || bridgeStatus.status === 'cancelled') {
             await this.refundIntent(swap.intent_id, swap.swap_id);
           }
@@ -353,8 +471,10 @@ export class E2EOrchestrator {
   async getHealth(): Promise<{
     database: boolean;
     bridge: boolean;
+    fallback_bridge: boolean;
     inventory: boolean;
     account: boolean;
+    prover: boolean;
   }> {
     const dbHealthy = await this.db.healthCheck();
     let bridgeHealthy = false;
@@ -364,14 +484,24 @@ export class E2EOrchestrator {
     } catch {
       bridgeHealthy = false;
     }
+    let fallbackHealthy = false;
+    try {
+      await this.fallbackBridge.checkHealth();
+      fallbackHealthy = true;
+    } catch {
+      fallbackHealthy = false;
+    }
     const inventoryHealthy = await this.inventory.isHealthy();
     const accountHealthy = this.privacyHub.isInitialized();
+    const proverHealthy = this.privacyHub.isProverAvailable();
 
     return {
       database: dbHealthy,
       bridge: bridgeHealthy,
+      fallback_bridge: fallbackHealthy,
       inventory: inventoryHealthy,
       account: accountHealthy,
+      prover: proverHealthy,
     };
   }
 

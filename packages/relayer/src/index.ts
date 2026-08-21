@@ -6,10 +6,12 @@ import { MigrationRunner } from './db/migrate';
 import { InventoryManager } from './bridge/inventory';
 import { DepositEventListener } from './bridge/deposit-listener';
 import { LayerSwapRelayer } from './bridge/layerswap-relayer';
+import { StarkGateRelayer } from './bridge/starkgate-relayer';
 import { BaseAdapter } from '@nexora-protocol/sdk';
 import { RelayerPrivacyHubClient } from './privacy/privacy-hub-client';
 import { E2EOrchestrator } from './flow/e2e-flow';
 import { WithdrawalService } from './flow/withdrawal-flow';
+import { PrivateTransferService } from './flow/private-transfer-flow';
 import { RelayerApiServer } from './api/server';
 import { IntentRepository, SwapRepository, DepositRepository, ShieldTxRepository, InventoryRepository } from './db/repositories';
 
@@ -46,9 +48,13 @@ async function main(): Promise<void> {
   const privacyHub = new RelayerPrivacyHubClient(config, db);
   await privacyHub.initialize();
 
-  const bridge = new LayerSwapRelayer(config, db);
-  await bridge.checkHealth();
+  const primaryBridge = new LayerSwapRelayer(config, db);
+  await primaryBridge.checkHealth();
   console.log('LayerSwap bridge connected');
+
+  const fallbackBridge = new StarkGateRelayer(config);
+  await fallbackBridge.initialize();
+  console.log('StarkGate fallback bridge initialized');
 
   const baseAdapter = new BaseAdapter({
     apiKey: config.layerSwapApiKey,
@@ -66,12 +72,14 @@ async function main(): Promise<void> {
     swapRepo,
     depositRepo,
     shieldRepo,
-    bridge,
+    primaryBridge,
     privacyHub,
-    inventory
+    inventory,
+    fallbackBridge
   );
 
   const withdrawalService = new WithdrawalService(config, db, baseAdapter, privacyHub);
+  const privateTransferService = new PrivateTransferService(config, db, privacyHub);
 
   depositListener.setCallback(async (deposit) => {
     console.log(`Deposit callback: ${deposit.amount} USDC for intent ${deposit.intentId}`);
@@ -87,6 +95,18 @@ async function main(): Promise<void> {
     }
   });
 
+  fallbackBridge.monitorForDeposits((swapId, txHash, amount) => {
+    console.log(`StarkGate deposit detected: ${amount} for swap ${swapId} at ${txHash}`);
+    depositListener.handleExternalDeposit(swapId, txHash, amount).catch((err) => {
+      console.error('Failed to process StarkGate deposit:', err);
+    });
+  }).then((stop) => {
+    process.on('SIGTERM', () => stop());
+    process.on('SIGINT', () => stop());
+  }).catch((err) => {
+    console.error('Failed to start StarkGate monitor:', err);
+  });
+
   await depositListener.start();
   console.log('Deposit listener started');
 
@@ -98,6 +118,7 @@ async function main(): Promise<void> {
     inventory,
     baseAdapter,
     withdrawalService,
+    privateTransferService,
   });
 
   server.listen();

@@ -86,6 +86,7 @@ describe('E2EOrchestrator', () => {
   let mockBridge: LayerSwapRelayer;
   let mockPrivacyHub: RelayerPrivacyHubClient;
   let mockInventory: InventoryManager;
+  let mockFallbackBridge: any;
   let orchestrator: E2EOrchestrator;
 
   beforeEach(() => {
@@ -136,6 +137,7 @@ describe('E2EOrchestrator', () => {
     mockPrivacyHub = {
       initialize: vi.fn().mockResolvedValue(undefined),
       isInitialized: vi.fn().mockReturnValue(true),
+      isProverAvailable: vi.fn().mockReturnValue(true),
       shield: vi.fn().mockResolvedValue({
         transactionHash: '0xshield123',
         noteHash: '0xnote123',
@@ -144,6 +146,16 @@ describe('E2EOrchestrator', () => {
         status: 'ACCEPTED_ON_L2',
       }),
       getBalance: vi.fn().mockResolvedValue(100000000n),
+    } as any;
+
+    mockFallbackBridge = {
+      checkHealth: vi.fn().mockResolvedValue(undefined),
+      getBridgeStatus: vi.fn().mockResolvedValue({
+        swapId: 'swap-123',
+        status: 'pending',
+        confirmations: 0,
+        maxConfirmations: 1,
+      }),
     } as any;
 
     mockInventory = {
@@ -169,7 +181,8 @@ describe('E2EOrchestrator', () => {
       mockShieldRepo,
       mockBridge,
       mockPrivacyHub,
-      mockInventory
+      mockInventory,
+      mockFallbackBridge
     );
   });
 
@@ -235,24 +248,27 @@ describe('E2EOrchestrator', () => {
 
     it('should release inventory on failure', async () => {
       mockBridge.getLimits = vi.fn().mockRejectedValue(new Error('Bridge API down'));
+      mockFallbackBridge.reserveBridge = vi.fn().mockRejectedValue(new Error('Fallback also down'));
 
-      await expect(orchestrator.processIntent(submission)).rejects.toThrow('Bridge API down');
+      await expect(orchestrator.processIntent(submission)).rejects.toThrow('Fallback also down');
       expect(mockInventory.release).toHaveBeenCalledWith('starknet', 'USDC', 100000000n);
     });
 
     it('should mark intent as failed on error', async () => {
       mockBridge.getLimits = vi.fn().mockRejectedValue(new Error('Bridge API down'));
+      mockFallbackBridge.reserveBridge = vi.fn().mockRejectedValue(new Error('Fallback also down'));
 
-      await expect(orchestrator.processIntent(submission)).rejects.toThrow('Bridge API down');
+      await expect(orchestrator.processIntent(submission)).rejects.toThrow('Fallback also down');
       expect(mockIntentRepo.updateStatus).toHaveBeenCalledWith(
-        expect.any(String), 'failed', 'Bridge API down'
+        expect.any(String), 'failed', expect.stringContaining('Fallback also down')
       );
     });
 
     it('should reject amounts outside bridge limits', async () => {
       mockBridge.getLimits = vi.fn().mockResolvedValue({ min: 10, max: 50 });
+      mockFallbackBridge.reserveBridge = vi.fn().mockRejectedValue(new Error('Amount outside fallback limits'));
 
-      await expect(orchestrator.processIntent(submission)).rejects.toThrow('outside bridge limits');
+      await expect(orchestrator.processIntent(submission)).rejects.toThrow('outside fallback limits');
     });
   });
 
@@ -424,8 +440,10 @@ describe('E2EOrchestrator', () => {
 
       expect(health.database).toBe(true);
       expect(health.bridge).toBe(true);
+      expect(health.fallback_bridge).toBe(true);
       expect(health.inventory).toBe(true);
       expect(health.account).toBe(true);
+      expect(health.prover).toBe(true);
     });
 
     it('should return bridge unhealthy when checkHealth throws', async () => {
@@ -433,6 +451,13 @@ describe('E2EOrchestrator', () => {
 
       const health = await orchestrator.getHealth();
       expect(health.bridge).toBe(false);
+    });
+
+    it('should return fallback bridge unhealthy when checkHealth throws', async () => {
+      mockFallbackBridge.checkHealth = vi.fn().mockRejectedValue(new Error('API down'));
+
+      const health = await orchestrator.getHealth();
+      expect(health.fallback_bridge).toBe(false);
     });
   });
 });

@@ -291,6 +291,57 @@ export class DepositEventListener {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  async handleExternalDeposit(swapId: string, txHash: string, amount: bigint): Promise<void> {
+    const swap = await this.swapRepo.getBySwapId(swapId);
+    if (!swap) {
+      console.warn(`External deposit for unknown swap: ${swapId}`);
+      return;
+    }
+
+    const exists = await this.depositRepo.exists(txHash, 'starkgate', this.relayerAddress, 0);
+    if (exists) {
+      console.debug(`External deposit already recorded: ${txHash}`);
+      return;
+    }
+
+    const deposit: ProcessedDeposit = {
+      id: `ext_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
+      intentId: swap.intent_id,
+      swapId: swap.swap_id,
+      sourceTxHash: txHash,
+      fromAddress: 'starkgate',
+      toAddress: this.relayerAddress,
+      amount,
+      token: 'USDC',
+      tokenAddress: this.usdcTokenAddress,
+      blockNumber: 0,
+      blockHash: '',
+    };
+
+    await this.db.executeInTransaction(async (client) => {
+      const repo = new DepositRepository(client);
+      await repo.create({
+        id: deposit.id,
+        intent_id: deposit.intentId,
+        swap_id: deposit.swapId,
+        source_tx_hash: deposit.sourceTxHash,
+        from_address: deposit.fromAddress,
+        to_address: deposit.toAddress,
+        amount: deposit.amount.toString(),
+        token: deposit.token,
+        block_number: deposit.blockNumber,
+        block_hash: deposit.blockHash,
+        status: 'detected',
+      });
+    });
+
+    console.log(`External deposit recorded: ${Number(amount) / 1e6} USDC for swap ${swapId}`);
+
+    if (this.callback) {
+      await this.callback(deposit);
+    }
+  }
+
   getRelayerAddress(): string {
     return this.relayerAddress;
   }

@@ -10,6 +10,7 @@ import type { DepositEventListener } from '../bridge/deposit-listener';
 import type { InventoryManager } from '../bridge/inventory';
 import type { BaseAdapter } from '@nexora-protocol/sdk';
 import type { WithdrawalService } from '../flow/withdrawal-flow';
+import type { PrivateTransferService } from '../flow/private-transfer-flow';
 import { randomUUID } from 'crypto';
 
 export interface ApiDependencies {
@@ -20,6 +21,7 @@ export interface ApiDependencies {
   inventory: InventoryManager;
   baseAdapter: BaseAdapter;
   withdrawalService: WithdrawalService;
+  privateTransferService: PrivateTransferService;
 }
 
 export class RelayerApiServer {
@@ -71,6 +73,9 @@ export class RelayerApiServer {
     this.app.post('/withdrawals', this.handleSubmitWithdrawal.bind(this));
     this.app.get('/withdrawals/:id', this.handleGetWithdrawal.bind(this));
     this.app.post('/withdrawals/:id/unshield', this.handleExecuteUnshield.bind(this));
+
+    this.app.post('/private-transfers', this.handleSubmitPrivateTransfer.bind(this));
+    this.app.get('/private-transfers/:id', this.handleGetPrivateTransfer.bind(this));
 
     this.app.post('/webhooks/layerswap', this.handleLayerSwapWebhook.bind(this));
 
@@ -504,6 +509,79 @@ export class RelayerApiServer {
     } catch (error: any) {
       console.error('Failed to execute unshield:', error);
       res.status(500).json({ error: 'unshield_failed', message: error.message });
+    }
+  }
+
+  private async handleSubmitPrivateTransfer(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        userId,
+        token,
+        amount,
+        viewingKey,
+        recipient,
+        referenceId,
+      } = req.body;
+
+      if (!userId) {
+        res.status(400).json({ error: 'user_id is required' });
+        return;
+      }
+      if (!token || !amount || Number(amount) <= 0) {
+        res.status(400).json({ error: 'token and amount are required' });
+        return;
+      }
+      if (!viewingKey || !viewingKey.publicKey || !viewingKey.privateKey) {
+        res.status(400).json({ error: 'viewingKey is required' });
+        return;
+      }
+      if (!recipient) {
+        res.status(400).json({ error: 'recipient is required' });
+        return;
+      }
+
+      const result = await this.deps.privateTransferService.processTransfer({
+        userId,
+        token,
+        amount: String(amount),
+        viewingKey,
+        recipient,
+        referenceId,
+      });
+
+      res.status(201).json({
+        transferId: result.transferId,
+        status: result.status,
+        txHash: result.txHash,
+        nullifier: result.nullifier,
+        amount: result.amount,
+        token: result.token,
+        recipient: result.recipient,
+        referenceId: result.referenceId,
+      });
+    } catch (error: any) {
+      console.error('Failed to submit private transfer:', error);
+      res.status(400).json({
+        error: 'private_transfer_failed',
+        message: error.message,
+      });
+    }
+  }
+
+  private async handleGetPrivateTransfer(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const status = await this.deps.privateTransferService.getTransferStatus(id);
+
+      if (!status) {
+        res.status(404).json({ error: 'transfer_not_found', transferId: id });
+        return;
+      }
+
+      res.json(status);
+    } catch (error: any) {
+      console.error('Failed to get private transfer:', error);
+      res.status(500).json({ error: 'internal_error', message: error.message });
     }
   }
 
